@@ -3,7 +3,7 @@
 //     return 5;
 // }
 
-fn main [argc:int argv:char**]
+fn main:int [argc:int argv:char**]
 {
     printf("hello\n");
     printf("argc=%d\n", argc);

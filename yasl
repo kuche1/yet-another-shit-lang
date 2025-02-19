@@ -4,5 +4,11 @@
     set -euo pipefail
 
     mypy --strict yasl.py
+
+    pylint yasl.py --disable=line-too-long,trailing-whitespace,fixme,missing-module-docstring,missing-function-docstring,use-implicit-booleaness-not-len,missing-class-docstring,broad-exception-raised,unspecified-encoding
+    # fixme - any todo comments
+
+    echo '~~~~~~~~~~~~~~~~~~~~~~'
+
     python3 yasl.py
 }

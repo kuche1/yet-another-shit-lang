@@ -1,8 +1,6 @@
 #! /usr/bin/env python3
 
-from typing import IO
 import subprocess
-import shutil
 import enum
 import os
 
@@ -27,18 +25,20 @@ VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP]
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
 
+# pop: whitespace
+
 def pop_whitespace(src:str) -> str:
 
     while True:
         if len(src) == 0:
             break
-        
+
         ch = src[0]
 
         if ch in WHITESPACE:
             src = src[1:]
             continue
-    
+
         if ch == '/':
             if len(src) >= 2:
                 if src[1] == '/':
@@ -49,8 +49,10 @@ def pop_whitespace(src:str) -> str:
                     continue
 
         break
-    
+
     return src
+
+# pop: var name
 
 def pop_var_name(src:str, justreturnif:None|str=None) -> tuple[str, str]:
     src = pop_whitespace(src)
@@ -70,40 +72,20 @@ def pop_var_name(src:str, justreturnif:None|str=None) -> tuple[str, str]:
             break
 
         data += ch
-    
+
     assert len(data)
 
     data = data.replace('-', '_')
 
     return src, data
 
-class Var_metatype(enum.Enum):
-    fn = 0
-    var = 1
-    val = 2
-def pop_var_metatype(src:str) -> tuple[str, Var_metatype]:
-    src, metatype = pop_var_name(src)
+# pop: var name and type
 
-    if metatype == 'fn':
-        mt = Var_metatype.fn
-    elif metatype == 'var':
-        mt = Var_metatype.var
-    elif metatype == 'val':
-        mt = Var_metatype.val
-    else:
-        raise Exception(f'unknown var metatype `{metatype}`')
-
-    return src, mt
-
-def pop_fn_arg_begin(src:str) -> str:
-    src, fn_arg_begin = pop_var_name(src, justreturnif=FN_ARG_BEGIN)
-    assert fn_arg_begin == FN_ARG_BEGIN
-    return src
-
-def pop_fn_arg_or_end(src:str) -> tuple[str, None|tuple[str,str]]:
-    src, name = pop_var_name(src, justreturnif=FN_ARG_END)
-    if name == FN_ARG_END:
-        return src, None
+def pop_var_name_and_type(src:str, just_return_if_varname_is:None|str=None) -> tuple[str, str|tuple[str, str]]:
+    src, name = pop_var_name(src, just_return_if_varname_is)
+    if isinstance(just_return_if_varname_is, str):
+        if name == just_return_if_varname_is:
+            return src, just_return_if_varname_is
     
     src, sep = pop_var_name(src, justreturnif=VAR_TYPE_SEP)
     assert sep == VAR_TYPE_SEP
@@ -112,17 +94,64 @@ def pop_fn_arg_or_end(src:str) -> tuple[str, None|tuple[str,str]]:
 
     return src, (name, typ)
 
+# pop: var metatype
+
+class VarMetatype(enum.Enum):
+    FN = 0
+    VAR = 1
+    VAL = 2
+
+def pop_var_metatype(src:str) -> tuple[str, VarMetatype]:
+    src, metatype = pop_var_name(src)
+
+    if metatype == 'fn':
+        mt = VarMetatype.FN
+    elif metatype == 'var':
+        mt = VarMetatype.VAR
+    elif metatype == 'val':
+        mt = VarMetatype.VAL
+    else:
+        raise Exception(f'unknown var metatype `{metatype}`')
+
+    return src, mt
+
+# pop: fn name
+
+def pop_fn_name_and_returntype(src:str) -> tuple[str, tuple[str, str]]:
+    src, name_and_returntype = pop_var_name_and_type(src)
+    assert isinstance(name_and_returntype, tuple) # make mypy happy
+    return src, name_and_returntype
+
+# pop: fn arg
+
+def pop_fn_arg_begin(src:str) -> str:
+    src, fn_arg_begin = pop_var_name(src, justreturnif=FN_ARG_BEGIN)
+    assert fn_arg_begin == FN_ARG_BEGIN
+    return src
+
+def pop_fn_arg_or_end(src:str) -> tuple[str, None|tuple[str,str]]:
+    src, name_and_type = pop_var_name_and_type(src, just_return_if_varname_is=FN_ARG_END)
+    if name_and_type == FN_ARG_END:
+        return src, None
+
+    assert isinstance(name_and_type, tuple)
+    # make mypy happy
+    
+    return src, name_and_type
+
 def pop_fn_args(src:str) -> tuple[str, tuple[tuple[str,str], ...]]:
     src = pop_fn_arg_begin(src)
 
     args = []
     while True:
         src, arg = pop_fn_arg_or_end(src)
-        if arg == None:
+        if arg is None:
             break
         args.append(arg)
 
     return src, tuple(args)
+
+# pop: fn body
 
 def pop_fn_body_begin(src:str) -> str:
     src, fn_body_begin = pop_var_name(src, justreturnif=FN_BODY_BEGIN)
@@ -146,79 +175,82 @@ def pop_fn_body(src:str) -> tuple[str, str]:
         data += ch
     return src, data
 
-os.makedirs(FOLDER_TMP, exist_ok=True)
+# main
 
-with open(FILE_INPUT, 'r') as f_in:
-    yasl_src = f_in.read()
+def main() -> None:
 
-with open(FILE_TMP_OUTPUT, 'w') as f_out:
+    os.makedirs(FOLDER_TMP, exist_ok=True)
 
-    f_out.write('#include <stdio.h>\n')
-    f_out.write('\n')
+    with open(FILE_INPUT, 'r') as f_in:
+        yasl_src = f_in.read()
 
-    while True:
+    with open(FILE_TMP_OUTPUT, 'w') as f_out:
 
-        yasl_src = pop_whitespace(yasl_src)
+        f_out.write('#include <stdio.h>\n')
+        f_out.write('\n')
 
-        if len(yasl_src) == 0:
-            break
+        while True:
 
-        yasl_src, metatype = pop_var_metatype(yasl_src)
+            yasl_src = pop_whitespace(yasl_src)
 
-        match metatype:
+            if len(yasl_src) == 0:
+                break
 
-            case Var_metatype.fn:
-                print('yeee function')
+            yasl_src, metatype = pop_var_metatype(yasl_src)
 
-                # return type
+            match metatype:
 
-                f_out.write('__attribute__((warn_unused_result)) int ')
-                # `-Wunused-result` doesn't do the trick
+                case VarMetatype.FN:
+                    print('yeee function')
 
-                # name
+                    # name and return type
 
-                yasl_src, name = pop_var_name(yasl_src)
-                f_out.write(name)
+                    yasl_src, (name, ret_type) = pop_fn_name_and_returntype(yasl_src)
 
-                # args
+                    f_out.write(f'__attribute__((warn_unused_result)) {ret_type} {name}')
+                    # `-Wunused-result` doesn't do the trick
 
-                f_out.write('(')
+                    # args
 
-                yasl_src, args = pop_fn_args(yasl_src)
+                    f_out.write('(')
 
-                args_str = ''
+                    yasl_src, args = pop_fn_args(yasl_src)
 
-                if len(args) == 0:
-                    args_str += 'void'
-                else:
-                    for arg_name, arg_type in args:
-                        args_str += f'{arg_type} {arg_name}, '
+                    args_str = ''
 
-                    if args_str.endswith(', '):
-                        args_str = args_str[:-2]
+                    if len(args) == 0:
+                        args_str += 'void'
+                    else:
+                        for arg_name, arg_type in args:
+                            args_str += f'{arg_type} {arg_name}, '
 
-                f_out.write(args_str)
+                        if args_str.endswith(', '):
+                            args_str = args_str[:-2]
 
-                f_out.write(')')
+                    f_out.write(args_str)
 
-                # body
+                    f_out.write(')')
 
-                f_out.write('\n{\n')
-                yasl_src, body = pop_fn_body(yasl_src)
-                f_out.write(body)
-                f_out.write('\n}\n')
+                    # body
 
-            case Var_metatype.var:
-                print('yee var')
-                raise NotImplementedError()
+                    f_out.write('\n{\n')
+                    yasl_src, body = pop_fn_body(yasl_src)
+                    f_out.write(body)
+                    f_out.write('\n}\n')
 
-            case Var_metatype.val:
-                print('yeee val')
-                raise NotImplementedError()
+                case VarMetatype.VAR:
+                    print('yee var')
+                    raise NotImplementedError()
 
-            case _:
-                assert False
+                case VarMetatype.VAL:
+                    print('yeee val')
+                    raise NotImplementedError()
 
-term(['gcc', '-Werror', '-Wextra', '-Wall', '-pedantic', '-Wfatal-errors', '-Wshadow', '-fwrapv', '-o', FILE_EXECUTABLE, FILE_TMP_OUTPUT])
+                case _:
+                    assert False
 
-term([FILE_EXECUTABLE])
+    term(['gcc', '-Werror', '-Wextra', '-Wall', '-pedantic', '-Wfatal-errors', '-Wshadow', '-fwrapv', '-o', FILE_EXECUTABLE, FILE_TMP_OUTPUT])
+
+    term([FILE_EXECUTABLE])
+
+main()
