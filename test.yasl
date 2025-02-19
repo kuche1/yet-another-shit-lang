@@ -8,6 +8,8 @@
 // `!` return error
 // ? `@` return value exactly as specified ?
 // actually, those are going to make this whole thing much more complex
+// UPDATE
+// or maybe `:` would mean define as is and `!` would mean define with -wunused-result
 
 // TODO function declaration
 //fn@ main:int [argc:int argv:char**]
