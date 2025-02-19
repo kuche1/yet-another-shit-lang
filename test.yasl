@@ -9,6 +9,21 @@
 // ? `@` return value exactly as specified ?
 // actually, those are going to make this whole thing much more complex
 
+// TODO function declaration
+//fn@ main:int [argc:int argv:char**]
+
+// TODO call C function without any checks
+// @printf[]
+
+// TODO? make all fnc args const (we're going to eventually run into a problem in the future if we don't fix thos)
+
+fn add-int:int [a:int b:int]
+{
+    var sum:int a
+    inc sum b
+    ret sum
+}
+
 fn main:int [argc:int argv:char**]
 {
     printf["asdfg\n"]
@@ -34,8 +49,8 @@ fn main:int [argc:int argv:char**]
     dec b 5
     printf["b=%d\n" b]
 
+    val c:int add-int[6 8]
+    printf["c=%d\n" c]
+
     ret 0
 }
-
-// fn main:int
-// compile time yasl error: function already defined

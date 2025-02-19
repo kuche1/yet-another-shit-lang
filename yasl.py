@@ -103,7 +103,26 @@ class Src:
 
             break
 
-    # pop: var name
+    # pop: misc
+
+    def pop_var_type_sep(self, name:str) -> None:
+        if self.pop_var_name(orr=VAR_TYPE_SEP) != VAR_TYPE_SEP:
+            self.err(f'expected a variable type seperator `{VAR_TYPE_SEP}` after `{name}`')
+
+    def pop_var_value(self) -> str:
+        value_or_fnccall = self.pop_var_name()
+        print(f'pop_var_value: {value_or_fnccall=}')
+
+        fncargs = self.popif_tuple()
+        print(f'pop_var_value: {fncargs=}')
+        if fncargs is None:
+            # return the value
+            return value_or_fnccall
+        
+        # is a function call
+        return f'{value_or_fnccall}({', '.join(fncargs)})'
+
+    # pop: var name + misc
 
     def popif_var_name(self, orr:None|str=None) -> None|str:
         self.pop_whitespace()
@@ -147,6 +166,9 @@ class Src:
 
         assert isinstance(name, str) # make mypy happy
         return name
+    
+    def unpop_var_name(self, name:str) -> None:
+        self.src = name + ' ' + self.src
 
     # pop: var name and type
 
@@ -154,9 +176,9 @@ class Src:
         name = self.pop_var_name(orr=orr)
         if name == orr:
             return orr
-        
-        assert self.pop_var_name(orr=VAR_TYPE_SEP) == VAR_TYPE_SEP
-        
+
+        self.pop_var_type_sep(name)
+
         typ = self.pop_var_name()
 
         return name, typ
@@ -184,13 +206,14 @@ class Src:
 
     # pop: tuple
 
-    def pop_tuple(self, err:str) -> tuple[str, ...]:
+    def popif_tuple(self) -> None|tuple[str, ...]:
         # TODO we're not taking care of string
         # TODO actually, anything with space doesnt work (like `(void * ) a` or `a + b`)
 
         tuple_begin = self.pop_var_name(orr=TUPLE_BEGIN)
         if tuple_begin != TUPLE_BEGIN:
-            self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
+            self.unpop_var_name(tuple_begin)
+            return None
 
         the_tuple = []
         while True:
@@ -200,10 +223,19 @@ class Src:
             the_tuple.append(item)
         return tuple(the_tuple)
 
+    def pop_tuple(self, err:str) -> tuple[str, ...]:
+        data = self.popif_tuple()
+        if data is None:
+            self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
+
+        assert data is not None # make mypy happy
+        return data
+
     # pop: fn name
 
     def pop_fn_name(self, *, orr:None|str=None) -> str:
-        return self.pop_var_name(orr=orr)
+        ret = self.pop_var_name(orr=orr)
+        return ret
 
     def pop_fn_name_and_returntype(self) -> tuple[str, str]:
         return self.pop_var_name_and_type()
@@ -247,7 +279,8 @@ class Src:
 
     def pop_fn_body_element(self) -> str:
         while True:
-            fn_name = self.pop_fn_name(orr=FN_BODY_END)
+            fn_name = self.pop_fn_name(orr=FN_BODY_END) # TODO! there needs to be pop_statement_beginning
+            print(f'pop_fn_body_element: evaluating body element `{fn_name}`')
 
             # fn body end
 
@@ -260,20 +293,13 @@ class Src:
                 val_to_return = self.pop_var_name()
                 return f'return {val_to_return};'
             
-            # val set
-
-            if fn_name == 'val':
-                val_name, val_type = self.pop_var_name_and_type()
-                val_value = self.pop_var_name()
-                return f'const {val_type} {val_name} = {val_value};\n'
-            
             # var set
 
-            if fn_name == 'var':
-                # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
+            if fn_name in ['val', 'var']:
                 var_name, var_type = self.pop_var_name_and_type()
-                var_value = self.pop_var_name()
-                return f'{var_type} {var_name} = {var_value};\n'
+                var_value = self.pop_var_value()
+                const_prefix = 'const ' if fn_name == 'val' else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
+                return f'{const_prefix}{var_type} {var_name} = {var_value};\n'
 
             # variable increase
 
@@ -293,8 +319,12 @@ class Src:
 
             self.register_function_call(fn_name)
 
+            print(f'~~~ pop_fn_body_element: {self.src[:20]=}')
+
             # TODO we should that name with the existing functions, and in that case we should say that there needs to be either a valid function name or one of the operators checked for above in this fnc
             fn_call_args = self.pop_fn_call_args(fn_name)
+
+            print(f'~~~ pop_fn_body_element: {self.src[:20]=}')
 
             return f'{fn_name}({', '.join(fn_call_args)});\n'
 
