@@ -24,9 +24,6 @@ WHITESPACE = [' ', '\t', NEWLINE]
 FN_ARG_BEGIN = '['
 FN_ARG_END = ']'
 
-# TODO!!! delete
-# FN_BODY_BEGIN = '{'
-# FN_BODY_END = '}'
 CODE_BLOCK_BEGIN = '{'
 CODE_BLOCK_END = '}'
 
@@ -586,7 +583,11 @@ class Src:
 
             if statement_begin == ST_BEG_IF:
                 cond = self.pop_value()
-                code = self.pop_fn_body('TODO fix this') # TODO!!! split to `pop_code_block`
+
+                err, code = self.pop_code_block()
+                if err:
+                    self.err(f'`{ST_BEG_IF}` statement: could not get code block `{CODE_BLOCK_BEGIN}`, instead got `{code}`')
+                assert isinstance(code, CCode) # make mypy happy
 
                 ret = CCode('if(')
                 ret += cond
