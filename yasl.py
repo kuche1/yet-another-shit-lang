@@ -24,8 +24,11 @@ WHITESPACE = [' ', '\t', NEWLINE]
 FN_ARG_BEGIN = '['
 FN_ARG_END = ']'
 
-FN_BODY_BEGIN = '{'
-FN_BODY_END = '}'
+# TODO!!! delete
+# FN_BODY_BEGIN = '{'
+# FN_BODY_END = '}'
+CODE_BLOCK_BEGIN = '{'
+CODE_BLOCK_END = '}'
 
 VAR_TYPE_SEP = ':'
 
@@ -43,7 +46,8 @@ ST_BEG_VAR = 'var'
 ST_BEG_INC = 'inc'
 ST_BEG_DEC = 'dec'
 ST_BEG_CAST = 'cast'
-STATEMENT_BEGINNINGS = [ST_BEG_RET, ST_BEG_VAL, ST_BEG_VAR, ST_BEG_INC, ST_BEG_DEC, ST_BEG_CAST]
+ST_BEG_IF = 'if'
+STATEMENT_BEGINNINGS = [ST_BEG_RET, ST_BEG_VAL, ST_BEG_VAR, ST_BEG_INC, ST_BEG_DEC, ST_BEG_CAST, ST_BEG_IF]
 
 MT_FN_DEF = 'fn'
 MT_FN_DEC = 'fn@'
@@ -95,6 +99,9 @@ CC_OB = CCode('(')
 CC_CB = CCode(')')
 CC_COMMA_SPACE = CCode(', ')
 CC_WARNUNUSEDRESULT_SPACE = CCode('__attribute__((warn_unused_result)) ')
+CC_CBO = CCode('{')
+CC_CBC = CCode('}')
+CC_NEWLINE = CCode('\n')
 
 ###
 ### fncs
@@ -481,23 +488,27 @@ class Src:
     def pop_fn_call_args(self, fn_name:str) -> tuple[CCode, ...]:
         return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
 
-    # pop: fn body
+    # pop: code block
 
     def pop_statement_beginning(self, *, orr:None|str=None) -> str:
         return self.pop_fn_name(orr=orr)
 
-    def pop_fn_body_begin(self, fn_name:str) -> None:
-        fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
-        if fn_body_begin != FN_BODY_BEGIN:
-            self.err(f'expected function body `{FN_BODY_BEGIN}` for function `{fn_name}`, instead got `{fn_body_begin}`')
+    def pop_code_block_begin(self) -> tuple[Literal[True],str] | tuple[Literal[False],None]:
+        fn_body_begin = self.popif_var_name(orr=CODE_BLOCK_BEGIN)
+        if fn_body_begin != CODE_BLOCK_BEGIN:
+            if fn_body_begin is None:
+                return True, '<end of input reached>'
+            self.unpop_var_name(fn_body_begin)
+            return True, fn_body_begin
+        return False, None
 
-    def pop_fn_body_element(self) -> None|CCode:
+    def pop_code_block_element(self) -> None|CCode:
         while True:
-            statement_begin = self.pop_statement_beginning(orr=FN_BODY_END)
+            statement_begin = self.pop_statement_beginning(orr=CODE_BLOCK_END)
 
             # fn body end
 
-            if statement_begin == FN_BODY_END:
+            if statement_begin == CODE_BLOCK_END:
                 return None
             
             # ret
@@ -570,6 +581,21 @@ class Src:
                 ret += cast_from
                 ret += CC_SEMICOLON_NEWLINE
                 return ret
+            
+            # if
+
+            if statement_begin == ST_BEG_IF:
+                cond = self.pop_value()
+                code = self.pop_fn_body('TODO fix this') # TODO!!! split to `pop_code_block`
+
+                ret = CCode('if(')
+                ret += cond
+                ret += CC_CB
+                ret += CC_CBO
+                ret += code
+                ret += CC_CBC
+                ret += CC_NEWLINE
+                return ret
 
             # fn call
 
@@ -591,17 +617,47 @@ class Src:
 
             self.err(f'a valid statement beginning needs to be provided; those inclide {STATEMENT_BEGINNINGS}; this could also be a function call (could not find function `{statement_begin}`)')
 
-    def pop_fn_body(self, fn_name:str) -> CCode:
-        self.pop_fn_body_begin(fn_name)
+    def pop_code_block(self) -> tuple[Literal[True],str] | tuple[Literal[False],CCode]:
+        err, instead_got = self.pop_code_block_begin()
+        if err:
+            assert isinstance(instead_got, str) # make mypy happy
+            return True, instead_got
 
         data:CCode = CCode('')
         while True:
-            body_element_or_end:None|CCode = self.pop_fn_body_element()
-            if body_element_or_end is None:
+            body_element:None|CCode = self.pop_code_block_element()
+            if body_element is None:
                 break
 
-            data += body_element_or_end
+            data += body_element
 
+        return False, data
+
+    # pop: function body
+
+    # def pop_fn_body_begin(self, fn_name:str) -> None:
+    #     fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
+    #     if fn_body_begin != FN_BODY_BEGIN:
+    #         self.err(f'expected function body `{FN_BODY_BEGIN}` for function `{fn_name}`, instead got `{fn_body_begin}`')
+
+    # def pop_fn_body(self, fn_name:str) -> CCode:
+    #     self.pop_fn_body_begin(fn_name)
+
+    #     data:CCode = CCode('')
+    #     while True:
+    #         body_element_or_end:None|CCode = self.pop_fn_body_element()
+    #         if body_element_or_end is None:
+    #             break
+
+    #         data += body_element_or_end
+
+    #     return data
+
+    def pop_fn_body(self, fn_name:str) -> CCode:
+        err, data = self.pop_code_block()
+        if err:
+            self.err(f'function `{fn_name}`: could not find function body `{CODE_BLOCK_BEGIN}`, instead got `{data}`')
+        assert isinstance(data, CCode) # make mypy happy
         return data
 
     # pop: macro

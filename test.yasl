@@ -19,9 +19,11 @@
 // macro add [a b]
 //     (a + b)
 
-fn@ printf:int (const char *restrict format, ...)
+// stdlib funcs
+fn@ printf:int (const char *restrict format, ...) // I use macros here cuz i can't be bothered to implement restrict
+fn@ rand:int []
 
-fn@ test123:int []
+fn@ test123:int [] // TODO since this is declared without warn_unused_result it fucks over the GCC ret value checks
 
 fn add-int:int [a:int b:int]
 {
@@ -69,5 +71,10 @@ fn test123:int []
 {
     // TODO? automatically determine if fnc should be void
     printf['ho ho ho merry fuckmas\n'] // https://youtu.be/yM4-fLcJPTk?si=_lCNt72lQsMVZkVC&t=140
+
+    if rand[] {
+        ret 1
+    }
+
     ret 0
 }
