@@ -8,7 +8,7 @@
 
     mypy yasl.py --strict
 
-    pylint yasl.py --disable=line-too-long,trailing-whitespace,fixme,missing-module-docstring,missing-function-docstring,use-implicit-booleaness-not-len,missing-class-docstring,broad-exception-raised,unspecified-encoding,too-many-return-statements,too-many-public-methods,consider-using-with,too-many-locals,too-many-statements
+    pylint yasl.py --disable=line-too-long,trailing-whitespace,fixme,missing-module-docstring,missing-function-docstring,use-implicit-booleaness-not-len,missing-class-docstring,broad-exception-raised,unspecified-encoding,too-many-return-statements,too-many-public-methods,consider-using-with,too-many-locals,too-many-statements,superfluous-parens
     # pylint definetely catches some mistakes that mypy doesn't
     # fixme - any todo comments
 

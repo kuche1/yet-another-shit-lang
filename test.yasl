@@ -1,8 +1,4 @@
 
-// fn asdfg[]{
-//     return 5;
-// }
-
 // TODO
 // `:` return void and put return value in arg pointer
 // `!` return error
@@ -24,6 +20,8 @@
 //     (a + b)
 
 fn@ printf:int (const char *restrict format, ...)
+
+fn@ test123:int []
 
 fn add-int:int [a:int b:int]
 {
@@ -62,5 +60,14 @@ fn main:int [argc:int argv_cpp:char**]
     val fib(2):int add-int[fib(0) fib(1)]
     printf['fib(2)=%d\n' fib(2)]
 
+    test123[]
+
+    ret 0
+}
+
+fn test123:int []
+{
+    // TODO? automatically determine if fnc should be void
+    printf['ho ho ho merry fuckmas\n'] // https://youtu.be/yM4-fLcJPTk?si=_lCNt72lQsMVZkVC&t=140
     ret 0
 }

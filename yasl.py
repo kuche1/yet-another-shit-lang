@@ -3,6 +3,7 @@
 # TODO write function body inplace instead of returning a billion times
 
 # from typing import NewType
+from typing import NoReturn
 from typing import Literal
 from typing import Any
 import subprocess
@@ -174,7 +175,9 @@ class Src:
         
         self.line_number = 1
 
-        self.declared_functions:list[str] = [] # TODO ideally we would also check the types
+        # TODO ideally we would also check the types
+        self.declared_functions:list[str] = []
+        self.defined_functions:list[str] = []
 
     def __del__(self) -> None:
         self.file_out.close()
@@ -191,18 +194,28 @@ class Src:
     def write_ccode(self, code:CCode) -> None:
         self.file_out.write(code.val)
     
-    def err(self, err_msg:str) -> None:
+    def err(self, err_msg:str) -> NoReturn:
         print(f'ERROR: file `{self.file_in}`: line {self.line_number}: {err_msg}', file=sys.stderr)
         sys.exit(1)
     
     def register_function_declaration(self, fn_name:str) -> None:
+        # TODO check if A DIFFERENT declaration was already registered
+        # if fn_name in self.declared_functions:
+        #     self.err(f'function `{fn_name}` already declared')
+        if (fn_name not in self.declared_functions) and (fn_name not in self.defined_functions):
+            self.declared_functions.append(fn_name)
+
+    def register_function_definition(self, fn_name:str) -> None:
+        if fn_name in self.defined_functions:
+            self.err(f'function `{fn_name}` already defined')
+        self.defined_functions.append(fn_name)
         if fn_name in self.declared_functions:
-            self.err(f'function `{fn_name}` already declared')
-        self.declared_functions.append(fn_name)
+            self.declared_functions.remove(fn_name)
+        # TODO check the ret type and args too
     
     def function_in_register(self, fn_name:str) -> bool:
-        # TODO if we could also check the arg types that would be awesome
-        return fn_name in self.declared_functions
+        # TODO if we could also check the arg types
+        return (fn_name in self.declared_functions) or (fn_name in self.defined_functions)
 
     # pop: whitespace
 
@@ -236,7 +249,7 @@ class Src:
 
     def pop_var_type_sep(self, name:str) -> None:
         if self.pop_var_name(orr=VAR_TYPE_SEP) != VAR_TYPE_SEP:
-            self.err(f'expected a variable type seperator `{VAR_TYPE_SEP}` after `{name}`')
+            self.err(f'expected a type seperator `{VAR_TYPE_SEP}` after `{name}`')
 
     # pop: var name
 
@@ -245,10 +258,7 @@ class Src:
 
         data = ''
 
-        while True:
-            if len(self.src) == 0:
-                break
-
+        while not self.no_more_code():
             ch = self.src[0]
             self.src = self.src[1:]
 
@@ -276,7 +286,6 @@ class Src:
                 msg += f' or `{orr}`'
             self.err(msg)
 
-        assert isinstance(name, str) # make mypy happy
         return name
     
     def unpop_var_name(self, name:str) -> None:
@@ -306,34 +315,6 @@ class Src:
         return self.pop_var_name()
 
     # pop: value
-
-    # TODO! this is only a reference
-    # def popif_var_name(self, orr:None|str) -> None|str:
-    #     self.pop_whitespace()
-
-    #     data = ''
-
-    #     while True:
-    #         if len(self.src) == 0:
-    #             break
-
-    #         ch = self.src[0]
-    #         self.src = self.src[1:]
-
-    #         if data + ch == orr:
-    #             data += ch
-    #             break
-
-    #         if ch in VAR_NAME_SEPARATORS:
-    #             self.src = ch + self.src
-    #             break
-
-    #         data += ch
-
-    #     if len(data) == 0:
-    #         return None
-
-    #     return data
 
     def pop_value_orr(self, *, orr:None|str) -> Literal[True]|CCode:
         # TODO not taking care of `"`
@@ -377,7 +358,7 @@ class Src:
 
         # `value` could be a value in itself or a function call
 
-        # TODO! we should also be checking if such a function exists
+        # TODO!! we should also be checking if such a function exists
         fncargs = self.popif_tuple()
         if fncargs is None:
             return value_to_ccode(value)
@@ -425,8 +406,6 @@ class Src:
         data = self.popif_tuple()
         if data is None:
             self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
-
-        assert data is not None # make mypy happy
         return data
 
     # pop: fn name
@@ -436,20 +415,22 @@ class Src:
         return ret
 
     def pop_fn_name_and_returntype(self) -> tuple[str, str]:
-        return self.pop_var_name_and_type()
+        ret = self.pop_var_name_and_type()
+        return ret
 
     # pop: fn arg
 
-    # returns True if error
+    # returns False if error
     def popif_fn_arg_begin(self) -> bool:
-        fn_arg_begin = self.pop_var_name(orr=FN_ARG_BEGIN)
-        ret = fn_arg_begin != FN_ARG_BEGIN
-        if ret:
-            self.unpop_var_name(fn_arg_begin)
+        fn_arg_begin = self.popif_var_name(orr=FN_ARG_BEGIN)
+        ret = (fn_arg_begin == FN_ARG_BEGIN)
+        if not ret:
+            if fn_arg_begin is not None:
+                self.unpop_var_name(fn_arg_begin)
         return ret
 
     def pop_fn_arg_begin(self) -> None:
-        assert self.popif_fn_arg_begin() is False
+        assert self.popif_fn_arg_begin() is True
 
     def pop_fn_def_arg_or_end(self) -> None|tuple[str,str]:
         name_and_type = self.pop_var_name_and_type_orr(orr=FN_ARG_END)
@@ -462,7 +443,7 @@ class Src:
         return name_and_type
 
     def popif_fn_def_args(self) -> None|tuple[tuple[str,str], ...]:
-        if self.popif_fn_arg_begin():
+        if not self.popif_fn_arg_begin():
             return None
 
         args = []
@@ -491,7 +472,11 @@ class Src:
         if args is not None:
             return argtuple_to_cdeclargs(args)
 
-        return self.pop_macro_body()
+        body = self.popif_macro_body()
+        if body is not None:
+            return body
+        
+        self.err('could not get function declaration args, tried both definition args and macro args')
 
     def pop_fn_call_args(self, fn_name:str) -> tuple[CCode, ...]:
         return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
@@ -501,9 +486,10 @@ class Src:
     def pop_statement_beginning(self, *, orr:None|str=None) -> str:
         return self.pop_fn_name(orr=orr)
 
-    def pop_fn_body_begin(self) -> None:
+    def pop_fn_body_begin(self, fn_name:str) -> None:
         fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
-        assert fn_body_begin == FN_BODY_BEGIN
+        if fn_body_begin != FN_BODY_BEGIN:
+            self.err(f'expected function body `{FN_BODY_BEGIN}` for function `{fn_name}`, instead got `{fn_body_begin}`')
 
     def pop_fn_body_element(self) -> None|CCode:
         while True:
@@ -605,8 +591,8 @@ class Src:
 
             self.err(f'a valid statement beginning needs to be provided; those inclide {STATEMENT_BEGINNINGS}; this could also be a function call (could not find function `{statement_begin}`)')
 
-    def pop_fn_body(self) -> CCode:
-        self.pop_fn_body_begin()
+    def pop_fn_body(self, fn_name:str) -> CCode:
+        self.pop_fn_body_begin(fn_name)
 
         data:CCode = CCode('')
         while True:
@@ -620,14 +606,14 @@ class Src:
 
     # pop: macro
 
-    def pop_macro_body(self) -> CCode:
+    def popif_macro_body(self) -> None|CCode:
         self.pop_whitespace()
 
         if self.no_more_code():
-            self.err(f'reached end of source code before macro beginning `{MACRO_BODY_BEGIN}` could be found')
+            return None
         
         if self.src[0] != MACRO_BODY_BEGIN:
-            self.err(f'a macro beginning `{MACRO_BODY_BEGIN}` needs to follow, instead got `{self.src[0]}`')
+            return None
 
         self.src = self.src[1:]
 
@@ -688,7 +674,7 @@ def main() -> None:
                 # name and return type
 
                 fn_name, ret_type = src.pop_fn_name_and_returntype()
-                src.register_function_declaration(fn_name)
+                src.register_function_definition(fn_name)
 
                 src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
                 src.write_ccode(type_to_ccode(ret_type))
@@ -705,7 +691,7 @@ def main() -> None:
                 # body
 
                 src.write_ccode(CCode('\n{\n'))
-                body = src.pop_fn_body()
+                body = src.pop_fn_body(fn_name)
                 src.write_ccode(body)
                 src.write_ccode(CCode('\n}\n'))
 
