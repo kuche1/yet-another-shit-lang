@@ -46,14 +46,23 @@ MACRO_BODY_END = ')'
 # right now those CAN be part of a variable name
 # I'm intentionally keeping this here, just to see what happens
 
-# type
+# c code
 
 CCode = typing.NewType("CCode", str)
+
+CC_SPACE = CCode(' ')
+CC_SEMICOLON_NEWLINE = CCode(';\n')
+CC_ASSIGN = CCode(' = ')
+CC_OB = CCode('(')
+CC_CB = CCode(')')
 
 # fnc
 
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
+
+def ccodecat(*arg:CCode) -> CCode:
+    return CCode(''.join(arg))
 
 def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
     ret = ''
@@ -67,17 +76,20 @@ def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
 
     return cast(CCode, ret)
 
-def argtuple_to_cdeclargs(args:tuple[tuple[str, str], ...]) -> str:
-    if len(args) == 0:
-        return 'void'
-
+def argtuple_to_cdeclargs(args:tuple[tuple[str, str], ...]) -> CCode:
     ret = ''
-    for arg_name, arg_type in args:
-        arg_name = varname_to_ccode(arg_name)
-        ret += f'{arg_type} {arg_name}, '
-    if ret.endswith(', '):
-        ret = ret[:-2]
-    return ret
+
+    if len(args) == 0:
+        ret += 'void'
+    else:
+        for arg_name, arg_type in args:
+            arg_name = varname_to_ccode(arg_name)
+            arg_type = type_to_ccode(arg_type)
+            ret += f'{arg_type} {arg_name}, '
+        if ret.endswith(', '):
+            ret = ret[:-2]
+
+    return cast(CCode, ret)
 
 def varname_to_ccode(name:str) -> CCode:
     # TODO! we're using this in more places than we should - in the future this is going to fuck strings over
@@ -92,15 +104,29 @@ def value_to_ccode(value:str) -> CCode:
     # TODO what about strings ?
     return varname_to_ccode(value)
 
+def type_to_ccode(typ:str) -> CCode:
+    return cast(CCode, typ)
+
+def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
+    ret = CCode('')
+    for arg in args:
+        if len(ret):
+            ret = ccodecat(ret, CCode(', '), arg)
+        else:
+            ret = arg
+    return ret
+
 # class
 
 class Src:
 
-    def __init__(self, file:str) -> None:
-        self.file = file
+    def __init__(self, file_in:str, file_out:str) -> None:
+        self.file_in = file_in
 
-        with open(file, 'r') as f:
+        with open(file_in, 'r') as f:
             self.src = f.read()
+        
+        self.file_out = open(file_out, 'w')
         
         self.line_number = 1
 
@@ -110,8 +136,11 @@ class Src:
     def no_more_code(self) -> bool:
         return len(self.src) == 0
     
+    def write_ccode(self, code:CCode) -> None:
+        self.file_out.write(code)
+    
     def err(self, err_msg:str) -> None:
-        print(f'ERROR: file `{self.file}`: line {self.line_number}: {err_msg}', file=sys.stderr)
+        print(f'ERROR: file `{self.file_in}`: line {self.line_number}: {err_msg}', file=sys.stderr)
         sys.exit(1)
     
     def register_function_declaration(self, fn_name:str) -> None:
@@ -130,6 +159,7 @@ class Src:
         for fn_called in self.called_functions:
             if fn_called not in self.declared_functions:
                 self.err(f'function `{fn_called}` called but never defined')
+        self.file_out.close()
 
     # pop: whitespace
 
@@ -246,9 +276,10 @@ class Src:
         
         # is a function call
         c_fn_name = varname_to_ccode(value_or_fnccall)
-        c_fn_args = argtuple_to_ccallargs(fncargs)
-        c_code = f'{c_fn_name}({c_fn_args})'
-        return cast(CCode, c_code)
+        c_fn_args = ctuple_to_ccallargs(fncargs)
+        ret = ccodecat(c_fn_name, CC_OB, c_fn_args, CC_CB)
+        print(f'dbg: pop_value_orr: {ret=}')
+        return ret
 
     def pop_value(self) -> CCode:
         ret = self.pop_value_orr(orr=None)
@@ -257,7 +288,7 @@ class Src:
 
     # pop: tuple
 
-    def popif_tuple(self) -> None|tuple[str, ...]:
+    def popif_tuple(self) -> None|tuple[CCode, ...]:
         # TODO we're not taking care of string
         # TODO actually, anything with space doesnt work (like `(void * ) a` or `a + b`)
 
@@ -271,7 +302,7 @@ class Src:
     
         self.src = self.src[1:]
 
-        the_tuple = []
+        the_tuple:list[CCode] = []
         while True:
             item = self.pop_value_orr(orr=TUPLE_END)
             if item is True:
@@ -279,7 +310,7 @@ class Src:
             the_tuple.append(item)
         return tuple(the_tuple)
 
-    def pop_tuple(self, err:str) -> tuple[str, ...]:
+    def pop_tuple(self, err:str) -> tuple[CCode, ...]:
         data = self.popif_tuple()
         if data is None:
             self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
@@ -344,7 +375,7 @@ class Src:
 
         return tuple(args)
 
-    def pop_fn_dec_args(self) -> str:
+    def pop_fn_dec_args(self) -> CCode:
         args = self.popif_fn_def_args()
         if args is not None:
             return argtuple_to_cdeclargs(args)
@@ -363,85 +394,111 @@ class Src:
         fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
         assert fn_body_begin == FN_BODY_BEGIN
 
-    def pop_fn_body_element(self) -> str:
+    def pop_fn_body_element(self) -> None|CCode:
         while True:
             statement_begin = self.pop_statement_beginning(orr=FN_BODY_END)
 
             # fn body end
 
             if statement_begin == FN_BODY_END:
-                return statement_begin
+                return None
             
             # ret
 
             if statement_begin == ST_BEG_RET:
                 val_to_return = self.pop_var_name()
                 val_to_return = varname_to_ccode(val_to_return)
-                return f'return {val_to_return};'
+                return CCode(f'return {val_to_return};')
             
-            # val or var
+            # val/var
 
             if statement_begin in [ST_BEG_VAL, ST_BEG_VAR]:
                 var_name, var_type = self.pop_var_name_and_type()
+
                 var_name = varname_to_ccode(var_name)
+
+                var_type = type_to_ccode(var_type)
+
                 var_value = self.pop_value()
+
                 const_prefix = 'const ' if statement_begin == ST_BEG_VAL else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
-                return f'{const_prefix}{var_type} {var_name} = {var_value};\n'
+                const_prefix = CCode(const_prefix)
 
-            # variable increase
+                return ccodecat(
+                    const_prefix, var_type, CC_SPACE, var_name,
+                    CC_ASSIGN,
+                    var_value, CC_SEMICOLON_NEWLINE)
 
-            if statement_begin == ST_BEG_INC:
+            # variable increase/decrease
+
+            if statement_begin in [ST_BEG_INC, ST_BEG_DEC]:
                 var_name = self.pop_var_name()
                 var_name = varname_to_ccode(var_name)
-                inc_value = self.pop_var_name()
-                return f'{var_name} += {inc_value};\n'
 
-            # variable decrease
+                value = self.pop_value()
 
-            if statement_begin == ST_BEG_DEC:
-                var_name = self.pop_var_name()
-                var_name = varname_to_ccode(var_name)
-                dec_value = self.pop_var_name()
-                return f'{var_name} -= {dec_value};\n'
+                change = '+=' if statement_begin == ST_BEG_INC else '-='
+                change = CCode(change)
+
+                return ccodecat(
+                    var_name,
+                    CC_SPACE, change, CC_SPACE,
+                    value, CC_SEMICOLON_NEWLINE)
             
             # cast
 
             if statement_begin == ST_BEG_CAST:
                 var = self.pop_var_name()
+                var = varname_to_ccode(var)
+
                 self.pop_var_type_sep(var)
+
                 new_c_type = self.pop_c_type()
+
                 cast_from = self.pop_value()
-                return f'{new_c_type} {var} = ({new_c_type}) {cast_from};\n' # TODO and what if it needs to be a constant ?
+
+                return ccodecat(
+                    new_c_type, CC_SPACE, var, # TODO and what if it needs to be a constant ?
+                    CC_ASSIGN,
+                    CC_OB, new_c_type, CC_CB, CC_SPACE, cast_from, CC_SEMICOLON_NEWLINE)
 
             # fn call
 
             if self.function_in_register(statement_begin):
                 self.register_function_call(statement_begin) # TODO! this might becode useless very soon
+
                 c_fn_name = varname_to_ccode(statement_begin)
+
                 fn_call_args = self.pop_fn_call_args(statement_begin)
                 c_fn_args = argtuple_to_ccallargs(fn_call_args)
-                return f'{c_fn_name}({c_fn_args});\n'
+
+                return ccodecat(c_fn_name, CC_OB, c_fn_args, CC_CB, CC_SEMICOLON_NEWLINE)
             
             # invalid
 
             self.err(f'a valid statement beginning needs to be provided; those inclide {STATEMENT_BEGINNINGS}; this could also be a function call (could not find function `{statement_begin}`)')
 
-    def pop_fn_body(self) -> str:
+    def pop_fn_body(self) -> CCode:
         self.pop_fn_body_begin()
 
-        data = ''
+        data:CCode = CCode('')
         while True:
-            body_element = self.pop_fn_body_element()
-            if body_element == FN_BODY_END:
+            body_element_or_end:None|CCode = self.pop_fn_body_element()
+            if body_element_or_end is None:
                 break
 
-            data += body_element
+            if body_element_or_end == 'const int fib$OB$2$CB$ = add$M$int$OB$fib$OB$0$CB$, fib$OB$1$CB$$CB$;\n':
+                print('~~~ ', end='')
+            print(f'dbg: pop_fn_body: {body_element_or_end=}')
+            body_element:CCode = body_element_or_end
+
+            data = ccodecat(data, body_element)
 
         return data
 
     # pop: macro
 
-    def pop_macro_body(self) -> str:
+    def pop_macro_body(self) -> CCode:
         self.pop_whitespace()
 
         if self.no_more_code():
@@ -457,17 +514,17 @@ class Src:
             self.err(f'could not find macro end `{MACRO_BODY_END}`')
         
         macro = self.src[:end]
-
         self.src = self.src[end+1:]
 
         assert MACRO_BODY_BEGIN not in macro
 
-        return macro
+        return CCode(macro)
 
     # pop: c related
 
-    def pop_c_type(self) -> str:
-        data = ''
+    def pop_c_type(self) -> CCode:
+        data:CCode = CCode('')
+
         while not self.no_more_code():
             ch = self.src[0]
             self.src = self.src[1:]
@@ -475,7 +532,7 @@ class Src:
             if ch in WHITESPACE:
                 break
         
-            data += ch
+            data = ccodecat(data, CCode(ch))
                 
         assert len(data)
 
@@ -488,66 +545,70 @@ def main() -> None:
 
     os.makedirs(FOLDER_TMP, exist_ok=True)
 
-    src = Src(FILE_INPUT)
+    src = Src(FILE_INPUT, FILE_TMP_OUTPUT)
 
-    with open(FILE_TMP_OUTPUT, 'w') as f_out:
+    # f_out.write('#include <stdio.h>\n')
+    # f_out.write('\n')
 
-        # f_out.write('#include <stdio.h>\n')
-        # f_out.write('\n')
+    while True:
 
-        while True:
+        src.pop_whitespace()
 
-            src.pop_whitespace()
+        if src.no_more_code():
+            break
 
-            if src.no_more_code():
-                break
+        metatype = src.pop_var_metatype()
 
-            metatype = src.pop_var_metatype()
+        if metatype == MT_FN_DEF:
 
-            if metatype == MT_FN_DEF:
+            # name and return type
 
-                # name and return type
+            fn_name, ret_type = src.pop_fn_name_and_returntype()
+            src.register_function_declaration(fn_name)
 
-                fn_name, ret_type = src.pop_fn_name_and_returntype()
-                src.register_function_declaration(fn_name)
-                fn_name = varname_to_ccode(fn_name)
+            src.write_ccode(cast(CCode, '__attribute__((warn_unused_result)) ')) # `-Wunused-result` doesn't do the trick
+            src.write_ccode(type_to_ccode(ret_type))
+            src.write_ccode(cast(CCode, ' '))
+            src.write_ccode(varname_to_ccode(fn_name))
 
-                f_out.write(f'__attribute__((warn_unused_result)) {ret_type} {fn_name}')
-                # `-Wunused-result` doesn't do the trick
+            # args
 
-                # args
+            src.write_ccode(cast(CCode, '('))
+            args = src.pop_fn_def_args()
+            src.write_ccode(argtuple_to_cdeclargs(args))
+            src.write_ccode(cast(CCode, ')'))
 
-                f_out.write('(')
+            # body
 
-                args = src.pop_fn_def_args()
+            src.write_ccode(cast(CCode, '\n{\n'))
+            body = src.pop_fn_body()
+            src.write_ccode(body)
+            src.write_ccode(cast(CCode, '\n}\n'))
 
-                f_out.write(argtuple_to_cdeclargs(args))
+        elif metatype == MT_FN_DEC:
 
-                f_out.write(')')
+            fn_name, ret_type = src.pop_fn_name_and_returntype()
+            src.register_function_declaration(fn_name)
 
-                # body
+            fn_name = varname_to_ccode(fn_name)
 
-                f_out.write('\n{\n')
-                body = src.pop_fn_body()
-                f_out.write(body)
-                f_out.write('\n}\n')
+            ret_type = type_to_ccode(ret_type)
 
-            elif metatype == MT_FN_DEC:
+            fn_args = src.pop_fn_dec_args()
 
-                fn_name, ret_type = src.pop_fn_name_and_returntype()
-                src.register_function_declaration(fn_name)
-                fn_name = varname_to_ccode(fn_name)
+            # TODO missing __attribute__((warn_unused_result))
+            # removed for now until I make a proper error handling system
+            src.write_ccode(ret_type)
+            src.write_ccode(CC_SPACE)
+            src.write_ccode(fn_name)
+            src.write_ccode(CC_OB)
+            src.write_ccode(fn_args) # we could have used `()` but unfortunately this doesnt work for stdlib fncs (line printf)
+            src.write_ccode(CC_CB)
+            src.write_ccode(CC_SEMICOLON_NEWLINE)
 
-                fn_args = src.pop_fn_dec_args()
-
-                # TODO missing __attribute__((warn_unused_result))
-                # removed for now until I make a proper error handling system
-                f_out.write(f'{ret_type} {fn_name}({fn_args});\n')
-                # we could have used `()` but unfortunately this doesnt work for stdlib fncs (line printf)
-
-            else:
-                
-                src.err(f'unknown metatype `{metatype}`; valid metatypes are {METATYPES}')
+        else:
+            
+            src.err(f'unknown metatype `{metatype}`; valid metatypes are {METATYPES}')
 
     src.end_of_compilation_checks()
 
