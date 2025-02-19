@@ -21,6 +21,8 @@
 // macro add [a b]
 //     (a + b)
 
+fn@ printf:int (const char *restrict format, ...)
+
 fn add-int:int [a:int b:int]
 {
     var sum:int a
@@ -28,12 +30,13 @@ fn add-int:int [a:int b:int]
     ret sum
 }
 
-fn main:int [argc:int argv:char**]
+fn main:int [argc:int argv_cpp:char**]
 {
     printf["asdfg\n"]
 
     printf["argc=%d\n" argc]
-    printf["argv=%p\n" (void*)argv]
+    cast argv:void* argv_cpp
+    printf["argv=%p\n" argv]
 
     val a:int 5
     printf["a=%d\n" a]
@@ -55,6 +58,11 @@ fn main:int [argc:int argv:char**]
 
     val c:int add-int[6 8]
     printf["c=%d\n" c]
+
+    val fib(0):int 0
+    val fib(1):int 1
+    val fib(2):int add-int[fib(0) fib(1)]
+    printf["fib(2)=%d\n" fib(2)] // TODO this shows up as fib$OB$2$CB$=1
 
     ret 0
 }
