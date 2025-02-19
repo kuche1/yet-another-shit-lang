@@ -1,5 +1,8 @@
 #! /usr/bin/env python3
 
+# TODO
+# make the input code into an object so that line number and character number can be tracked, so that we can put some understandable errors on screen
+
 import subprocess
 import enum
 import os
@@ -75,7 +78,9 @@ def pop_var_name(src:str, justreturnif:None|str=None) -> tuple[str, str]:
 
     assert len(data)
 
-    data = data.replace('-', '_')
+    # this make the resulting C code less readable
+    data = data.replace('-', '$MINUS$')
+    data = data.replace('+', '$PLUS$')
 
     return src, data
 

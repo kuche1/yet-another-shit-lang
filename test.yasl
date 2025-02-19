@@ -7,7 +7,7 @@ fn main:int [argc:int argv:char**]
 {
     printf("hello\n");
     printf("argc=%d\n", argc);
-    printf("argv=%p\n", (void*)argv);
+    printf("argv=%p\n", (void *) argv);
     // fuck();
     return 0;
 }
