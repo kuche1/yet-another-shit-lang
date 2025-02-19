@@ -1,6 +1,9 @@
 #! /usr/bin/env python3
 
+from typing import Literal
+from typing import cast
 import subprocess
+import typing
 import sys
 import os
 
@@ -43,22 +46,26 @@ MACRO_BODY_END = ')'
 # right now those CAN be part of a variable name
 # I'm intentionally keeping this here, just to see what happens
 
+# type
+
+CCode = typing.NewType("CCode", str)
+
 # fnc
 
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
 
-def argtuple_to_ccallargs(args:tuple[str, ...]) -> str:
+def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
     ret = ''
 
     for arg_name in args:
-        c_arg_name = varname_to_cvarname(arg_name)
+        c_arg_name = varname_to_ccode(arg_name)
         ret += f'{c_arg_name}, '
 
     if ret.endswith(', '):
         ret = ret[:-2]
 
-    return ret
+    return cast(CCode, ret)
 
 def argtuple_to_cdeclargs(args:tuple[tuple[str, str], ...]) -> str:
     if len(args) == 0:
@@ -66,20 +73,24 @@ def argtuple_to_cdeclargs(args:tuple[tuple[str, str], ...]) -> str:
 
     ret = ''
     for arg_name, arg_type in args:
-        arg_name = varname_to_cvarname(arg_name)
+        arg_name = varname_to_ccode(arg_name)
         ret += f'{arg_type} {arg_name}, '
     if ret.endswith(', '):
         ret = ret[:-2]
     return ret
 
-def varname_to_cvarname(name:str) -> str:
+def varname_to_ccode(name:str) -> CCode:
     # TODO! we're using this in more places than we should - in the future this is going to fuck strings over
     # maybe we could omit the `$` to make the code a bit more readable and compliant
     name = name.replace('-', '$M$')
     name = name.replace('+', '$P$')
     name = name.replace('(', '$OB$')
     name = name.replace(')', '$CB$')
-    return name
+    return cast(CCode, name)
+
+def value_to_ccode(value:str) -> CCode:
+    # TODO what about strings ?
+    return varname_to_ccode(value)
 
 # class
 
@@ -223,23 +234,26 @@ class Src:
 
     # pop: value
 
-    def pop_value_orr(self, orr:None|str) -> str:
-        value_or_fnccall = self.pop_var_name(orr=orr)
+    def pop_value_orr(self, *, orr:None|str) -> Literal[True]|CCode:
+        value_or_fnccall:str = self.pop_var_name(orr=orr)
         if value_or_fnccall == orr:
-            return value_or_fnccall
+            return True
 
         fncargs = self.popif_tuple()
         if fncargs is None:
             # return the value
-            return value_or_fnccall
+            return value_to_ccode(value_or_fnccall)
         
         # is a function call
-        c_fn_name = varname_to_cvarname(value_or_fnccall)
+        c_fn_name = varname_to_ccode(value_or_fnccall)
         c_fn_args = argtuple_to_ccallargs(fncargs)
-        return f'{c_fn_name}({c_fn_args})'
+        c_code = f'{c_fn_name}({c_fn_args})'
+        return cast(CCode, c_code)
 
-    def pop_value(self) -> str:
-        return self.pop_value_orr(None)
+    def pop_value(self) -> CCode:
+        ret = self.pop_value_orr(orr=None)
+        assert ret is not True # make mypy happy
+        return ret
 
     # pop: tuple
 
@@ -260,7 +274,7 @@ class Src:
         the_tuple = []
         while True:
             item = self.pop_value_orr(orr=TUPLE_END)
-            if item == TUPLE_END:
+            if item is True:
                 break
             the_tuple.append(item)
         return tuple(the_tuple)
@@ -362,14 +376,14 @@ class Src:
 
             if statement_begin == ST_BEG_RET:
                 val_to_return = self.pop_var_name()
-                val_to_return = varname_to_cvarname(val_to_return)
+                val_to_return = varname_to_ccode(val_to_return)
                 return f'return {val_to_return};'
             
             # val or var
 
             if statement_begin in [ST_BEG_VAL, ST_BEG_VAR]:
                 var_name, var_type = self.pop_var_name_and_type()
-                var_name = varname_to_cvarname(var_name)
+                var_name = varname_to_ccode(var_name)
                 var_value = self.pop_value()
                 const_prefix = 'const ' if statement_begin == ST_BEG_VAL else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
                 return f'{const_prefix}{var_type} {var_name} = {var_value};\n'
@@ -378,7 +392,7 @@ class Src:
 
             if statement_begin == ST_BEG_INC:
                 var_name = self.pop_var_name()
-                var_name = varname_to_cvarname(var_name)
+                var_name = varname_to_ccode(var_name)
                 inc_value = self.pop_var_name()
                 return f'{var_name} += {inc_value};\n'
 
@@ -386,7 +400,7 @@ class Src:
 
             if statement_begin == ST_BEG_DEC:
                 var_name = self.pop_var_name()
-                var_name = varname_to_cvarname(var_name)
+                var_name = varname_to_ccode(var_name)
                 dec_value = self.pop_var_name()
                 return f'{var_name} -= {dec_value};\n'
             
@@ -403,7 +417,7 @@ class Src:
 
             if self.function_in_register(statement_begin):
                 self.register_function_call(statement_begin) # TODO! this might becode useless very soon
-                c_fn_name = varname_to_cvarname(statement_begin)
+                c_fn_name = varname_to_ccode(statement_begin)
                 fn_call_args = self.pop_fn_call_args(statement_begin)
                 c_fn_args = argtuple_to_ccallargs(fn_call_args)
                 return f'{c_fn_name}({c_fn_args});\n'
@@ -496,7 +510,7 @@ def main() -> None:
 
                 fn_name, ret_type = src.pop_fn_name_and_returntype()
                 src.register_function_declaration(fn_name)
-                fn_name = varname_to_cvarname(fn_name)
+                fn_name = varname_to_ccode(fn_name)
 
                 f_out.write(f'__attribute__((warn_unused_result)) {ret_type} {fn_name}')
                 # `-Wunused-result` doesn't do the trick
@@ -522,7 +536,7 @@ def main() -> None:
 
                 fn_name, ret_type = src.pop_fn_name_and_returntype()
                 src.register_function_declaration(fn_name)
-                fn_name = varname_to_cvarname(fn_name)
+                fn_name = varname_to_ccode(fn_name)
 
                 fn_args = src.pop_fn_dec_args()
 
