@@ -262,7 +262,7 @@ class Src:
                 fn_call_args = self.pop_fn_call_args(fn_name)
                 return f'{fn_name}({', '.join(fn_call_args)});\n'
 
-            # idk
+            # not reachable
 
             assert False
 
