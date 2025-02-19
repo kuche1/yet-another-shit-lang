@@ -130,7 +130,7 @@ class Src:
 
     # pop: var name and type
 
-    def pop_var_name_and_type(self, *, orr:None|str=None) -> str|tuple[str, str]:
+    def pop_var_name_and_type_orr(self, *, orr:None|str=None) -> str|tuple[str, str]:
         name = self.pop_var_name(orr=orr)
         if name == orr:
             return orr
@@ -140,6 +140,11 @@ class Src:
         typ = self.pop_var_name()
 
         return name, typ
+
+    def pop_var_name_and_type(self) -> tuple[str, str]:
+        nametype_orr = self.pop_var_name_and_type_orr()
+        assert not isinstance(nametype_orr, str)
+        return nametype_orr
 
     # pop: var metatype
 
@@ -181,9 +186,7 @@ class Src:
         return self.pop_var_name(orr=orr)
 
     def pop_fn_name_and_returntype(self) -> tuple[str, str]:
-        name_and_returntype = self.pop_var_name_and_type()
-        assert isinstance(name_and_returntype, tuple) # make mypy happy
-        return name_and_returntype
+        return self.pop_var_name_and_type()
 
     # pop: fn arg
 
@@ -192,7 +195,7 @@ class Src:
         assert fn_arg_begin == FN_ARG_BEGIN
 
     def pop_fn_def_arg_or_end(self) -> None|tuple[str,str]:
-        name_and_type = self.pop_var_name_and_type(orr=FN_ARG_END)
+        name_and_type = self.pop_var_name_and_type_orr(orr=FN_ARG_END)
         if name_and_type == FN_ARG_END:
             return None
 
@@ -216,9 +219,13 @@ class Src:
     def pop_fn_call_args(self, fn_name:str) -> tuple[str, ...]:
         return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
 
-    # pop: fn call
+    # pop: fn body
 
-    def pop_fncall_or_fnbodyend_or_ret(self) -> str:
+    def pop_fn_body_begin(self) -> None:
+        fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
+        assert fn_body_begin == FN_BODY_BEGIN
+
+    def pop_fncall_or_fnbodyend_or_ret_or_valset(self) -> str:
         while True:
             fn_name = self.popif_fn_name(orr=FN_BODY_END)
             print(f'{fn_name=}')
@@ -233,6 +240,13 @@ class Src:
             if fn_name == 'ret':
                 val_to_return = self.pop_var_name()
                 return f'return {val_to_return};'
+            
+            # val set
+
+            if fn_name == 'val':
+                val_name, val_type = self.pop_var_name_and_type()
+                val_value = self.pop_var_name()
+                return f'const {val_type} {val_name} = {val_value};\n'
 
             # fn call
 
@@ -244,12 +258,6 @@ class Src:
 
             assert False
 
-    # pop: fn body
-
-    def pop_fn_body_begin(self) -> None:
-        fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
-        assert fn_body_begin == FN_BODY_BEGIN
-
     def pop_fn_body(self) -> str:
         self.pop_fn_body_begin()
 
@@ -257,7 +265,7 @@ class Src:
 
         data = ''
         while True:
-            fn_name_or_whatever = self.pop_fncall_or_fnbodyend_or_ret()
+            fn_name_or_whatever = self.pop_fncall_or_fnbodyend_or_ret_or_valset()
             if fn_name_or_whatever == FN_BODY_END:
                 break
 
