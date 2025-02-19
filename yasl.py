@@ -131,7 +131,7 @@ def varname_to_ccode(name:str) -> CCode:
     return CCode(name)
 
 def value_to_ccode(value:str) -> CCode:
-    # TODO what about strings ? this is a fucky implementation
+    # TODO! what about strings ? this is a fucky implementation
     return varname_to_ccode(value)
 
 def type_to_ccode(typ:str) -> CCode:
