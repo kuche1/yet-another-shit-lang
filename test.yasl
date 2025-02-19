@@ -1,10 +1,13 @@
 
-fn fuck[]{
-    return 5;
-}
+// fn fuck[]{
+//     return 5;
+// }
 
-fn main[]{
+fn main [argc:int argv:char**]
+{
     printf("hello\n");
-    fuck();
+    printf("argc=%d\n", argc);
+    printf("argv=%p\n", (void*)argv);
+    // fuck();
     return 0;
 }

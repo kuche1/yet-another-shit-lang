@@ -12,22 +12,22 @@ FILE_INPUT = os.path.join(HERE, 'test.yasl')
 FILE_TMP_OUTPUT = os.path.join(FOLDER_TMP, 'code.c')
 FILE_EXECUTABLE = os.path.join(FOLDER_TMP, 'executable')
 
+WHITESPACE = [' ', '\t', '\n']
+
 FN_ARG_BEGIN = '['
 FN_ARG_END = ']'
 
 FN_BODY_BEGIN = '{'
 FN_BODY_END = '}'
 
-WHITESPACE = [' ', '\t', '\n']
+VAR_TYPE_SEP = ':'
 
-VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END]
+VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP]
 
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
 
 def pop_whitespace(src:str) -> str:
-    # TODo use this where needed
-    # TODO handle comments
 
     while True:
         if len(src) == 0:
@@ -39,6 +39,15 @@ def pop_whitespace(src:str) -> str:
             src = src[1:]
             continue
     
+        if ch == '/':
+            if len(src) >= 2:
+                if src[1] == '/':
+                    next_newline = src.find('\n')
+                    if next_newline == -1:
+                        next_newline = len(src)
+                    src = src[next_newline+1:]
+                    continue
+
         break
     
     return src
@@ -91,16 +100,25 @@ def pop_fn_arg_begin(src:str) -> str:
     assert fn_arg_begin == FN_ARG_BEGIN
     return src
 
-def pop_fn_arg_or_end(src:str) -> tuple[str, str]:
-    return pop_var_name(src, justreturnif=FN_ARG_END)
+def pop_fn_arg_or_end(src:str) -> tuple[str, None|tuple[str,str]]:
+    src, name = pop_var_name(src, justreturnif=FN_ARG_END)
+    if name == FN_ARG_END:
+        return src, None
+    
+    src, sep = pop_var_name(src, justreturnif=VAR_TYPE_SEP)
+    assert sep == VAR_TYPE_SEP
+    
+    src, typ = pop_var_name(src)
 
-def pop_fn_args(src:str) -> tuple[str, tuple[str, ...]]:
+    return src, (name, typ)
+
+def pop_fn_args(src:str) -> tuple[str, tuple[tuple[str,str], ...]]:
     src = pop_fn_arg_begin(src)
 
     args = []
     while True:
         src, arg = pop_fn_arg_or_end(src)
-        if arg == FN_ARG_END:
+        if arg == None:
             break
         args.append(arg)
 
@@ -173,11 +191,11 @@ with open(FILE_TMP_OUTPUT, 'w') as f_out:
                 if len(args) == 0:
                     args_str += 'void'
                 else:
-                    for arg in args:
-                        args_str += f'int {arg}, '
+                    for arg_name, arg_type in args:
+                        args_str += f'{arg_type} {arg_name}, '
 
-                if args_str.endswith(', '):
-                    args_str = args_str[:-2]
+                    if args_str.endswith(', '):
+                        args_str = args_str[:-2]
 
                 f_out.write(args_str)
 
