@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-# TODO add string support so that printf doesnt shit itself occasionally
 # TODO write function body inplace instead of returning a billion times
 
 # from typing import NewType
@@ -32,7 +31,10 @@ VAR_TYPE_SEP = ':'
 TUPLE_BEGIN = FN_ARG_BEGIN
 TUPLE_END = FN_ARG_END
 
-VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END]
+STRING = "'"
+
+VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END] + [STRING]
+# TODO! rename to SEPARATOR or something similar
 
 ST_BEG_RET = 'ret'
 ST_BEG_VAL = 'val'
@@ -137,7 +139,12 @@ def varname_to_ccode(name:str) -> CCode:
     return CCode(name)
 
 def value_to_ccode(value:str) -> CCode:
-    # TODO! what about strings ? this is a fucky implementation
+    if value.startswith(STRING):
+        assert value.endswith(STRING)
+        assert len(value) >= 2
+        assert value[1:-1].count(STRING) == 0
+        assert value[1:-1].count('"') == 0
+        return CCode('"' + value[1:-1] + '"')
     return varname_to_ccode(value)
 
 def type_to_ccode(typ:str) -> CCode:
@@ -300,18 +307,83 @@ class Src:
 
     # pop: value
 
-    def pop_value_orr(self, *, orr:None|str) -> Literal[True]|CCode:
-        value_or_fnccall:str = self.pop_var_name(orr=orr)
-        if value_or_fnccall == orr:
-            return True
+    # TODO! this is only a reference
+    # def popif_var_name(self, orr:None|str) -> None|str:
+    #     self.pop_whitespace()
 
+    #     data = ''
+
+    #     while True:
+    #         if len(self.src) == 0:
+    #             break
+
+    #         ch = self.src[0]
+    #         self.src = self.src[1:]
+
+    #         if data + ch == orr:
+    #             data += ch
+    #             break
+
+    #         if ch in VAR_NAME_SEPARATORS:
+    #             self.src = ch + self.src
+    #             break
+
+    #         data += ch
+
+    #     if len(data) == 0:
+    #         return None
+
+    #     return data
+
+    def pop_value_orr(self, *, orr:None|str) -> Literal[True]|CCode:
+        # TODO not taking care of `"`
+        # TODO not taking care of \X
+
+        self.pop_whitespace()
+
+        in_string = False
+
+        value = ''
+
+        while not self.no_more_code():
+            ch = self.src[0]
+            self.src = self.src[1:]
+
+            if value + ch == orr:
+                return True
+
+            if in_string:
+                value += ch
+                if ch == STRING:
+                    in_string = False
+                    break
+                continue
+
+            # not in string
+
+            if ch == STRING:
+                in_string = True
+                assert len(value) == 0
+                value += ch
+                continue
+
+            if ch in VAR_NAME_SEPARATORS:
+                self.src = ch + self.src
+                break
+
+            value += ch
+
+        assert not in_string # should be unreachable
+
+        # `value` could be a value in itself or a function call
+
+        # TODO! we should also be checking if such a function exists
         fncargs = self.popif_tuple()
         if fncargs is None:
-            # return the value
-            return value_to_ccode(value_or_fnccall)
-        
+            return value_to_ccode(value)
+
         # is a function call
-        c_fn_name = varname_to_ccode(value_or_fnccall) # TODO if we are to implement anonymous functions this needs to change
+        c_fn_name = varname_to_ccode(value) # TODO if we are to implement anonymous functions this needs to change
         c_fn_args = ctuple_to_ccallargs(fncargs)
         ret = CCode('')
         ret += c_fn_name
@@ -321,7 +393,6 @@ class Src:
         return ret
 
     def pop_value(self) -> CCode:
-        # TODO! and what about strungs ?
         ret = self.pop_value_orr(orr=None)
         assert ret is not True # make mypy happy
         return ret

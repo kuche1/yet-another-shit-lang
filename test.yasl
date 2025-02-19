@@ -34,34 +34,33 @@ fn add-int:int [a:int b:int]
 
 fn main:int [argc:int argv_cpp:char**]
 {
-    printf["asdfg\n"]
+    printf["hi world\n"]
 
-    printf["argc=%d\n" argc]
     cast argv:void* argv_cpp
-    printf["argv=%p\n" argv]
+    printf['argc is %d AND argv is %p\n' argc argv]
 
     val a:int 5
-    printf["a=%d\n" a]
+    printf['a = %d\n' a]
 
     var b:int 6
-    printf["b=%d\n" b]
+    printf['b = %d\n' b]
 
     inc b 1
-    printf["b=%d\n" b]
+    printf['b = %d\n' b]
 
     inc b 2
-    printf["b=%d\n" b]
+    printf['b = %d\n' b]
 
     dec b 5
-    printf["b=%d\n" b]
+    printf['b = %d\n' b]
 
     val c:int add-int[6 8]
-    printf["c=%d\n" c]
+    printf['c = %d\n' c]
 
     val fib(0):int 0
     val fib(1):int 1
     val fib(2):int add-int[fib(0) fib(1)]
-    printf["fib(2)=%d\n" fib(2)] // TODO this shows up as fib$OB$2$CB$=1
+    printf['fib(2)=%d\n' fib(2)] // TODO this shows up as fib$OB$2$CB$=1
 
     ret 0
 }
