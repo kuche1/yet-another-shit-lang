@@ -263,6 +263,13 @@ class Src:
                 inc_value = self.pop_var_name()
                 return f'{var_name} += {inc_value};\n'
 
+            # variable decrease
+
+            if fn_name == 'dec':
+                var_name = self.pop_var_name()
+                dec_value = self.pop_var_name()
+                return f'{var_name} -= {dec_value};\n'
+
             # fn call
 
             # TODO we should that name with the existing functions, and in that case we should say that there needs to be either a valid function name or one of the operators checked for above in this fnc
