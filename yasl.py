@@ -1,10 +1,8 @@
 #! /usr/bin/env python3
 
-# TODO
-# make the input code into an object so that line number and character number can be tracked, so that we can put some understandable errors on screen
-
 import subprocess
 import enum
+import sys
 import os
 
 HERE = os.path.dirname(os.path.realpath(__file__))
@@ -13,7 +11,8 @@ FILE_INPUT = os.path.join(HERE, 'test.yasl')
 FILE_TMP_OUTPUT = os.path.join(FOLDER_TMP, 'code.c')
 FILE_EXECUTABLE = os.path.join(FOLDER_TMP, 'executable')
 
-WHITESPACE = [' ', '\t', '\n']
+NEWLINE = '\n'
+WHITESPACE = [' ', '\t', NEWLINE]
 
 FN_ARG_BEGIN = '['
 FN_ARG_END = ']'
@@ -45,11 +44,20 @@ def term(args:list[str]) -> None:
 class Src:
 
     def __init__(self, file:str) -> None:
+        self.file = file
+
         with open(file, 'r') as f:
             self.src = f.read()
+        
+        self.line_number = 1
 
     def no_more_code(self) -> bool:
         return len(self.src) == 0
+    
+    def asrt(self, condition:bool, err_msg:str) -> None:
+        if not condition:
+            print(f'ERROR: file `{self.file}`: line {self.line_number}: {err_msg}', file=sys.stderr)
+            sys.exit(1)
 
     # pop: whitespace
 
@@ -63,14 +71,17 @@ class Src:
 
             if ch in WHITESPACE:
                 self.src = self.src[1:]
+                self.line_number += ch.count(NEWLINE)
                 continue
 
             if ch == '/':
                 if len(self.src) >= 2:
                     if self.src[1] == '/':
-                        next_newline = self.src.find('\n')
+                        next_newline = self.src.find(NEWLINE)
                         if next_newline == -1:
                             next_newline = len(self.src)
+                        else:
+                            self.line_number += 1
                         self.src = self.src[next_newline+1:]
                         continue
 
@@ -141,7 +152,7 @@ class Src:
         # TODO we're not taking care of string
 
         tuple_begin = self.pop_var_name(justreturnif=TUPLE_BEGIN)
-        assert tuple_begin == TUPLE_BEGIN
+        self.asrt(tuple_begin == TUPLE_BEGIN, f'expected `{TUPLE_BEGIN}`')
 
         the_tuple = []
         while True:

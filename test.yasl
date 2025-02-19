@@ -19,4 +19,5 @@ fn main:int [argc:int argv:char**]
     printf["hello\n"]
 
     // return 0;
+    ret 0
 }
