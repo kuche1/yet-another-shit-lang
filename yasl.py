@@ -216,6 +216,11 @@ class Src:
         assert not isinstance(nametype_orr, str)
         return nametype_orr
 
+    # pop: var metatype
+
+    def pop_var_metatype(self) -> str:
+        return self.pop_var_name()
+
     # pop: value
 
     def pop_value_orr(self, orr:None|str) -> str:
@@ -235,11 +240,6 @@ class Src:
 
     def pop_value(self) -> str:
         return self.pop_value_orr(None)
-
-    # pop: var metatype
-
-    def pop_var_metatype(self) -> str:
-        return self.pop_var_name()
 
     # pop: tuple
 
