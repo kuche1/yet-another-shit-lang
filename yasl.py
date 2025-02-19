@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 # TODO write function body inplace instead of returning a billion times
+# TODo maybe I should give up on the stupid `fib(1)` variables and just use separators instead of that stupid `orr=`
 
 # from typing import NewType
 from typing import NoReturn
@@ -34,7 +35,11 @@ TUPLE_END = FN_ARG_END
 
 STRING = "'"
 
-VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END] + [STRING]
+FTS_NO_ERR = VAR_TYPE_SEP
+FTS_ERR = '!'
+FUNCTION_TYPE_SEPARATORS = [FTS_NO_ERR, FTS_ERR]
+
+VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END] + [STRING] + FUNCTION_TYPE_SEPARATORS
 # TODO! rename to SEPARATOR or something similar
 
 ST_BEG_RET = 'ret'
@@ -210,6 +215,7 @@ class Src:
             self.declared_functions.append(fn_name)
 
     def register_function_definition(self, fn_name:str) -> None:
+        # TODO!!! check (errtype, rettype, args) with the declaration if there is one
         if fn_name in self.defined_functions:
             self.err(f'function `{fn_name}` already defined')
         self.defined_functions.append(fn_name)
@@ -249,11 +255,68 @@ class Src:
 
             break
 
-    # pop: syntax characters
+    # pop: type separator
 
-    def pop_var_type_sep(self, name:str) -> None:
-        if self.pop_var_name(orr=VAR_TYPE_SEP) != VAR_TYPE_SEP:
-            self.err(f'expected a type seperator `{VAR_TYPE_SEP}` after `{name}`')
+    def pop_var_type_sep(self, var_name:str) -> None: # TODO!!! see where it's used and replace with `pop_fn_type_sep` where appropriate
+        sep = self.pop_var_name(orr=VAR_TYPE_SEP)
+        if sep != VAR_TYPE_SEP:
+            self.unpop_var_name(sep)
+            self.err(f'variable `{var_name}`: expected a type seperator `{VAR_TYPE_SEP}`, instead got `{sep}`')
+    
+    def pop_fn_type_sep(self, name:str) -> bool:
+        for fts in FUNCTION_TYPE_SEPARATORS: # TODO!!! add comment saying that this needs to be of length at least 1
+            sep = self.popif_var_name(orr=fts)
+            if sep == fts:
+                if sep == FTS_NO_ERR:
+                    return False
+                if sep == FTS_ERR:
+                    return True
+                assert False
+            if sep is not None:
+                self.unpop_var_name(sep)
+
+        if sep is None:
+            info = '<end of file>'
+        else:
+            info = sep
+
+        self.err(f'function `{name}`: expected one of the function type seperators {FUNCTION_TYPE_SEPARATORS}, instead got `{info}`')
+
+    # pop: type
+
+    def pop_type(self) -> str:
+        data = ''
+
+        while not self.no_more_code():
+            ch = self.src[0]
+            self.src = self.src[1:]
+
+            if ch in WHITESPACE:
+                break
+        
+            data += ch
+                
+        if len(data) == 0:
+            self.err('a type needs to be specified')
+
+        return data
+
+    def pop_c_type(self, name:str) -> CCode:
+        data:CCode = CCode('')
+
+        while not self.no_more_code():
+            ch = self.src[0]
+            self.src = self.src[1:]
+
+            if ch in WHITESPACE:
+                break
+        
+            data += CCode(ch)
+                
+        if data.empty():
+            self.err(f'a C type needs to be specified for `{name}`')
+
+        return data
 
     # pop: var name
 
@@ -412,83 +475,10 @@ class Src:
             self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
         return data
 
-    # pop: fn name
-
-    def pop_fn_name(self, *, orr:None|str=None) -> str:
-        ret = self.pop_var_name(orr=orr)
-        return ret
-
-    def pop_fn_name_and_returntype(self) -> tuple[str, str]:
-        ret = self.pop_var_name_and_type()
-        return ret
-
-    # pop: fn arg
-
-    # returns False if error
-    def popif_fn_arg_begin(self) -> bool:
-        fn_arg_begin = self.popif_var_name(orr=FN_ARG_BEGIN)
-        ret = (fn_arg_begin == FN_ARG_BEGIN)
-        if not ret:
-            if fn_arg_begin is not None:
-                self.unpop_var_name(fn_arg_begin)
-        return ret
-
-    def pop_fn_arg_begin(self) -> None:
-        assert self.popif_fn_arg_begin() is True
-
-    def pop_fn_def_arg_or_end(self) -> None|tuple[str,str]:
-        name_and_type = self.pop_var_name_and_type_orr(orr=FN_ARG_END)
-        if name_and_type == FN_ARG_END:
-            return None
-
-        assert isinstance(name_and_type, tuple)
-        # make mypy happy
-        
-        return name_and_type
-
-    def popif_fn_def_args(self) -> None|tuple[tuple[str,str], ...]:
-        if not self.popif_fn_arg_begin():
-            return None
-
-        args = []
-        while True:
-            arg = self.pop_fn_def_arg_or_end()
-            if arg is None:
-                break
-            args.append(arg)
-
-        return tuple(args)
-
-    def pop_fn_def_args(self) -> tuple[tuple[str,str], ...]:
-        self.pop_fn_arg_begin()
-
-        args = []
-        while True:
-            arg = self.pop_fn_def_arg_or_end()
-            if arg is None:
-                break
-            args.append(arg)
-
-        return tuple(args)
-
-    def pop_fn_dec_args(self) -> CCode:
-        args = self.popif_fn_def_args()
-        if args is not None:
-            return argtuple_to_cdeclargs(args)
-
-        body = self.popif_macro_body()
-        if body is not None:
-            return body
-        
-        self.err('could not get function declaration args, tried both definition args and macro args')
-
-    def pop_fn_call_args(self, fn_name:str) -> tuple[CCode, ...]:
-        return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
-
     # pop: code block
 
     def pop_statement_beginning(self, *, orr:None|str=None) -> str:
-        return self.pop_fn_name(orr=orr)
+        return self.pop_var_name(orr=orr)
 
     def pop_code_block_begin(self) -> tuple[Literal[True],str] | tuple[Literal[False],None]:
         fn_body_begin = self.popif_var_name(orr=CODE_BLOCK_BEGIN)
@@ -634,25 +624,80 @@ class Src:
 
         return False, data
 
-    # pop: function body
+    # pop: fn name can_return_error return_type
 
-    # def pop_fn_body_begin(self, fn_name:str) -> None:
-    #     fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
-    #     if fn_body_begin != FN_BODY_BEGIN:
-    #         self.err(f'expected function body `{FN_BODY_BEGIN}` for function `{fn_name}`, instead got `{fn_body_begin}`')
+    def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[str, bool, str]:
+        name = self.pop_var_name()
+        print(f'dbg: pop_fn_name_and_canreterr_and_rettype: {name=}')
+        canreterr = self.pop_fn_type_sep(name)
+        print(f'dbg: pop_fn_name_and_canreterr_and_rettype: {canreterr=}')
+        typ = self.pop_type() # TODO!!! use this in get_name_and_type or whatever its called
+        return name, canreterr ,typ
 
-    # def pop_fn_body(self, fn_name:str) -> CCode:
-    #     self.pop_fn_body_begin(fn_name)
+    # pop: fn arg
 
-    #     data:CCode = CCode('')
-    #     while True:
-    #         body_element_or_end:None|CCode = self.pop_fn_body_element()
-    #         if body_element_or_end is None:
-    #             break
+    # returns False if error
+    def popif_fn_arg_begin(self) -> bool:
+        fn_arg_begin = self.popif_var_name(orr=FN_ARG_BEGIN)
+        ret = (fn_arg_begin == FN_ARG_BEGIN)
+        if not ret:
+            if fn_arg_begin is not None:
+                self.unpop_var_name(fn_arg_begin)
+        return ret
 
-    #         data += body_element_or_end
+    def pop_fn_arg_begin(self) -> None:
+        assert self.popif_fn_arg_begin() is True
 
-    #     return data
+    def pop_fn_def_arg_or_end(self) -> None|tuple[str,str]:
+        name_and_type = self.pop_var_name_and_type_orr(orr=FN_ARG_END)
+        if name_and_type == FN_ARG_END:
+            return None
+
+        assert isinstance(name_and_type, tuple)
+        # make mypy happy
+        
+        return name_and_type
+
+    def popif_fn_def_args(self) -> None|tuple[tuple[str,str], ...]:
+        if not self.popif_fn_arg_begin():
+            return None
+
+        args = []
+        while True:
+            arg = self.pop_fn_def_arg_or_end()
+            if arg is None:
+                break
+            args.append(arg)
+
+        return tuple(args)
+
+    def pop_fn_def_args(self) -> tuple[tuple[str,str], ...]:
+        self.pop_fn_arg_begin()
+
+        args = []
+        while True:
+            arg = self.pop_fn_def_arg_or_end()
+            if arg is None:
+                break
+            args.append(arg)
+
+        return tuple(args)
+
+    def pop_fn_dec_args(self) -> CCode:
+        args = self.popif_fn_def_args()
+        if args is not None:
+            return argtuple_to_cdeclargs(args)
+
+        body = self.popif_macro_body()
+        if body is not None:
+            return body
+        
+        self.err('could not get function declaration args, tried both definition args and macro args')
+
+    def pop_fn_call_args(self, fn_name:str) -> tuple[CCode, ...]:
+        return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
+
+    # pop: fn body
 
     def pop_fn_body(self, fn_name:str) -> CCode:
         err, data = self.pop_code_block()
@@ -685,25 +730,6 @@ class Src:
 
         return CCode(macro)
 
-    # pop: c related
-
-    def pop_c_type(self, name:str) -> CCode:
-        data:CCode = CCode('')
-
-        while not self.no_more_code():
-            ch = self.src[0]
-            self.src = self.src[1:]
-
-            if ch in WHITESPACE:
-                break
-        
-            data += CCode(ch)
-                
-        if data.empty():
-            self.err(f'a C type needs to be specified for `{name}`')
-
-        return data
-
 ###
 ### main
 ###
@@ -730,11 +756,14 @@ def main() -> None:
 
                 # name and return type
 
-                fn_name, ret_type = src.pop_fn_name_and_returntype()
+                print('dbg: 1')
+                fn_name, fn_can_ret_err, fn_ret_type = src.pop_fn_name_and_canreterr_and_rettype()
                 src.register_function_definition(fn_name)
+                print(f'dbg: 2: {fn_name=}')
 
-                src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
-                src.write_ccode(type_to_ccode(ret_type))
+                if fn_can_ret_err:
+                    src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
+                src.write_ccode(type_to_ccode(fn_ret_type))
                 src.write_ccode(CC_SPACE)
                 src.write_ccode(varname_to_ccode(fn_name))
 
@@ -754,7 +783,7 @@ def main() -> None:
 
             elif metatype == MT_FN_DEC:
 
-                fn_name, ret_type = src.pop_fn_name_and_returntype()
+                fn_name, fn_canreterr, ret_type = src.pop_fn_name_and_canreterr_and_rettype()
                 src.register_function_declaration(fn_name)
 
                 c_fn_name = varname_to_ccode(fn_name)
@@ -763,8 +792,8 @@ def main() -> None:
 
                 fn_args = src.pop_fn_dec_args()
 
-                # TODO missing CC_WARNUNUSEDRESULT_SPACE
-                # removed for now until I make a proper error handling system
+                if fn_canreterr:
+                    src.write_ccode(CC_WARNUNUSEDRESULT_SPACE)
                 src.write_ccode(c_ret_type)
                 src.write_ccode(CC_SPACE)
                 src.write_ccode(c_fn_name)
