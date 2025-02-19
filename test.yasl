@@ -1,4 +1,5 @@
 
-int main(void){
+fn main[arg1 arg2 arg3]{
+    printf("hello\n");
     return 0;
 }
