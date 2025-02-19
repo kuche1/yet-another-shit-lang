@@ -20,7 +20,7 @@
 //     (a + b)
 
 // stdlib funcs
-fn@ printf:int (const char *restrict format, ...) // I use macros here cuz i can't be bothered to implement restrict
+fn@ printf:int (const char *restrict format, ...) // I use macros here cuz i can't be bothered to implement restrict and all that shit
 fn@ rand:int []
 
 fn@ test123!int []
@@ -63,7 +63,14 @@ fn main:int [argc:int argv_cpp:char**]
     val fib(2):int add-int[fib(0) fib(1)]
     printf['fib(2)=%d\n' fib(2)]
 
-    test123[] // TODO need to add syntax like `!test123[]` that adds a runtime assert
+    val x:int 21
+    val y:int 34
+    val fib(n-1):int x
+    val fib(n):int y
+    val fib(n+1):int add-int[fib(n) fib(n-1)]
+    printf['fib(n+1)=%d\n' fib(n+1)]
+
+    // test123[] // TODO need to add syntax like `!test123[]` that adds a runtime assert
 
     ret 0
 }

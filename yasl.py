@@ -4,6 +4,7 @@
 # TODO fix all the `!` todos and a coupld of the regular ones
 # TODO write function body inplace instead of returning a billion times
 # TODO maybe I should give up on the stupid `fib(1)` variables and just use separators instead of that stupid `orr=`
+# TODO implement normal + -
 
 # from typing import NewType
 from typing import NoReturn
