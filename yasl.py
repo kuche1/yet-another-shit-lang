@@ -103,7 +103,7 @@ class Src:
 
             break
 
-    # pop: misc
+    # pop: synctax characters
 
     def pop_var_type_sep(self, name:str) -> None:
         if self.pop_var_name(orr=VAR_TYPE_SEP) != VAR_TYPE_SEP:
@@ -111,10 +111,8 @@ class Src:
 
     def pop_var_value(self) -> str:
         value_or_fnccall = self.pop_var_name()
-        print(f'pop_var_value: {value_or_fnccall=}')
 
         fncargs = self.popif_tuple()
-        print(f'pop_var_value: {fncargs=}')
         if fncargs is None:
             # return the value
             return value_or_fnccall
@@ -279,54 +277,49 @@ class Src:
 
     def pop_fn_body_element(self) -> str:
         while True:
-            fn_name = self.pop_fn_name(orr=FN_BODY_END) # TODO! there needs to be pop_statement_beginning
-            print(f'pop_fn_body_element: evaluating body element `{fn_name}`')
+            statement_begin = self.pop_statement_beginning(orr=FN_BODY_END)
 
             # fn body end
 
-            if fn_name == FN_BODY_END:
-                return fn_name
+            if statement_begin == FN_BODY_END:
+                return statement_begin
             
             # ret
 
-            if fn_name == 'ret':
+            if statement_begin == 'ret':
                 val_to_return = self.pop_var_name()
                 return f'return {val_to_return};'
             
             # var set
 
-            if fn_name in ['val', 'var']:
+            if statement_begin in ['val', 'var']:
                 var_name, var_type = self.pop_var_name_and_type()
                 var_value = self.pop_var_value()
-                const_prefix = 'const ' if fn_name == 'val' else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
+                const_prefix = 'const ' if statement_begin == 'val' else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
                 return f'{const_prefix}{var_type} {var_name} = {var_value};\n'
 
             # variable increase
 
-            if fn_name == 'inc':
+            if statement_begin == 'inc':
                 var_name = self.pop_var_name()
                 inc_value = self.pop_var_name()
                 return f'{var_name} += {inc_value};\n'
 
             # variable decrease
 
-            if fn_name == 'dec':
+            if statement_begin == 'dec':
                 var_name = self.pop_var_name()
                 dec_value = self.pop_var_name()
                 return f'{var_name} -= {dec_value};\n'
 
             # fn call
 
-            self.register_function_call(fn_name)
-
-            print(f'~~~ pop_fn_body_element: {self.src[:20]=}')
+            self.register_function_call(statement_begin)
 
             # TODO we should that name with the existing functions, and in that case we should say that there needs to be either a valid function name or one of the operators checked for above in this fnc
-            fn_call_args = self.pop_fn_call_args(fn_name)
+            fn_call_args = self.pop_fn_call_args(statement_begin)
 
-            print(f'~~~ pop_fn_body_element: {self.src[:20]=}')
-
-            return f'{fn_name}({', '.join(fn_call_args)});\n'
+            return f'{statement_begin}({', '.join(fn_call_args)});\n'
 
     def pop_fn_body(self) -> str:
         self.pop_fn_body_begin()
@@ -340,6 +333,11 @@ class Src:
             data += body_element
 
         return data
+    
+    # pop: statement
+
+    def pop_statement_beginning(self, *, orr:None|str=None) -> str:
+        return self.pop_fn_name(orr=orr)
 
 # main
 
