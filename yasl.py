@@ -51,7 +51,8 @@ class Src:
         
         self.line_number = 1
 
-        self.defined_functions:list[str] = []
+        self.defined_functions:list[str] = ['printf'] # hack
+        self.called_functions:list[str] = []
 
     def no_more_code(self) -> bool:
         return len(self.src) == 0
@@ -64,6 +65,15 @@ class Src:
         if fn_name in self.defined_functions:
             self.err(f'function `{fn_name}` already defined')
         self.defined_functions.append(fn_name)
+    
+    def register_function_call(self, fn_name:str) -> None:
+        if fn_name not in self.called_functions: # or maybe just use a set
+            self.called_functions.append(fn_name)
+    
+    def end_of_compilation_checks(self) -> None:
+        for fn_called in self.called_functions:
+            if fn_called not in self.defined_functions:
+                self.err(f'function `{fn_called}` called but never defined')
 
     # pop: whitespace
 
@@ -120,7 +130,7 @@ class Src:
         if len(data) == 0:
             return None
 
-        # this make the resulting C code less readable
+        # this make the resulting C code less readable, maybe replace with M and P instead
         data = data.replace('-', '$MINUS$')
         data = data.replace('+', '$PLUS$')
 
@@ -238,7 +248,6 @@ class Src:
     def pop_fn_body_element(self) -> str:
         while True:
             fn_name = self.pop_fn_name(orr=FN_BODY_END)
-            print(f'{fn_name=}')
 
             # fn body end
 
@@ -282,14 +291,15 @@ class Src:
 
             # fn call
 
+            self.register_function_call(fn_name)
+
             # TODO we should that name with the existing functions, and in that case we should say that there needs to be either a valid function name or one of the operators checked for above in this fnc
             fn_call_args = self.pop_fn_call_args(fn_name)
+
             return f'{fn_name}({', '.join(fn_call_args)});\n'
 
     def pop_fn_body(self) -> str:
         self.pop_fn_body_begin()
-
-        # TODO missing implementation
 
         data = ''
         while True:
@@ -375,6 +385,8 @@ def main() -> None:
 
                 case _:
                     assert False
+
+    src.end_of_compilation_checks()
 
     term(['gcc', '-Werror', '-Wextra', '-Wall', '-pedantic', '-Wfatal-errors', '-Wshadow', '-fwrapv', '-o', FILE_EXECUTABLE, FILE_TMP_OUTPUT])
 
