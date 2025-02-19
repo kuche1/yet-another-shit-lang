@@ -58,7 +58,7 @@ class Src:
         
         self.line_number = 1
 
-        self.defined_functions:list[str] = ['printf'] # TODO hack # TODO change to declared_functions
+        self.declared_functions:list[str] = ['printf'] # TODO hack # TODO ideally we would also check the types
         self.called_functions:list[str] = []
 
     def no_more_code(self) -> bool:
@@ -68,21 +68,21 @@ class Src:
         print(f'ERROR: file `{self.file}`: line {self.line_number}: {err_msg}', file=sys.stderr)
         sys.exit(1)
     
-    def register_function_definition(self, fn_name:str) -> None:
-        if fn_name in self.defined_functions:
+    def register_function_declaration(self, fn_name:str) -> None:
+        if fn_name in self.declared_functions:
             self.err(f'function `{fn_name}` already defined')
-        self.defined_functions.append(fn_name)
+        self.declared_functions.append(fn_name)
     
     def register_function_call(self, fn_name:str) -> None:
         if fn_name not in self.called_functions: # or maybe just use a set
             self.called_functions.append(fn_name)
     
     def function_in_register(self, fn_name:str) -> bool:
-        return fn_name in self.defined_functions
+        return fn_name in self.declared_functions
     
     def end_of_compilation_checks(self) -> None:
         for fn_called in self.called_functions:
-            if fn_called not in self.defined_functions:
+            if fn_called not in self.declared_functions:
                 self.err(f'function `{fn_called}` called but never defined')
 
     # pop: whitespace
@@ -383,7 +383,7 @@ def main() -> None:
                     f_out.write(f'__attribute__((warn_unused_result)) {ret_type} {fn_name}')
                     # `-Wunused-result` doesn't do the trick
 
-                    src.register_function_definition(fn_name)
+                    src.register_function_declaration(fn_name)
 
                     # args
 
