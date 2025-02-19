@@ -3,8 +3,10 @@
 # TODO add string support so that printf doesnt shit itself occasionally
 # TODO write function body inplace instead of returning a billion times
 
-from typing import Literal
+
 # from typing import NewType
+from typing import Literal
+from typing import Any
 import subprocess
 import sys
 import os
@@ -166,7 +168,15 @@ class Src:
         self.line_number = 1
 
         self.declared_functions:list[str] = [] # TODO ideally we would also check the types
-        self.called_functions:list[str] = []
+
+    def __del__(self) -> None:
+        self.file_out.close()
+
+    def __enter__(self) -> 'Src':
+        return self
+
+    def __exit__(self, exc_type:Any, exc_val:Any, exc_tb:Any) -> None:
+        self.file_out.close()
 
     def no_more_code(self) -> bool:
         return len(self.src) == 0
@@ -183,18 +193,9 @@ class Src:
             self.err(f'function `{fn_name}` already declared')
         self.declared_functions.append(fn_name)
     
-    def register_function_call(self, fn_name:str) -> None:
-        if fn_name not in self.called_functions: # or maybe just use a set
-            self.called_functions.append(fn_name)
-    
     def function_in_register(self, fn_name:str) -> bool:
+        # TODO if we could also check the arg types that would be awesome
         return fn_name in self.declared_functions
-    
-    def end_of_compilation_checks(self) -> None:
-        for fn_called in self.called_functions:
-            if fn_called not in self.declared_functions:
-                self.err(f'function `{fn_called}` called but never defined')
-        self.file_out.close()
 
     # pop: whitespace
 
@@ -502,8 +503,6 @@ class Src:
             # fn call
 
             if self.function_in_register(statement_begin):
-                self.register_function_call(statement_begin) # TODO! this might becode useless very soon
-
                 c_fn_name = varname_to_ccode(statement_begin)
 
                 fn_call_args_ctuple = self.pop_fn_call_args(statement_begin)
@@ -581,72 +580,70 @@ def main() -> None:
 
     os.makedirs(FOLDER_TMP, exist_ok=True)
 
-    src = Src(FILE_INPUT, FILE_TMP_OUTPUT)
+    with Src(FILE_INPUT, FILE_TMP_OUTPUT) as src:
 
-    # f_out.write('#include <stdio.h>\n')
-    # f_out.write('\n')
+        # f_out.write('#include <stdio.h>\n')
+        # f_out.write('\n')
 
-    while True:
+        while True:
 
-        src.pop_whitespace()
+            src.pop_whitespace()
 
-        if src.no_more_code():
-            break
+            if src.no_more_code():
+                break
 
-        metatype = src.pop_var_metatype()
+            metatype = src.pop_var_metatype()
 
-        if metatype == MT_FN_DEF:
+            if metatype == MT_FN_DEF:
 
-            # name and return type
+                # name and return type
 
-            fn_name, ret_type = src.pop_fn_name_and_returntype()
-            src.register_function_declaration(fn_name)
+                fn_name, ret_type = src.pop_fn_name_and_returntype()
+                src.register_function_declaration(fn_name)
 
-            src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
-            src.write_ccode(type_to_ccode(ret_type))
-            src.write_ccode(CC_SPACE)
-            src.write_ccode(varname_to_ccode(fn_name))
+                src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
+                src.write_ccode(type_to_ccode(ret_type))
+                src.write_ccode(CC_SPACE)
+                src.write_ccode(varname_to_ccode(fn_name))
 
-            # args
+                # args
 
-            src.write_ccode(CC_OB)
-            args = src.pop_fn_def_args()
-            src.write_ccode(argtuple_to_cdeclargs(args))
-            src.write_ccode(CC_CB)
+                src.write_ccode(CC_OB)
+                args = src.pop_fn_def_args()
+                src.write_ccode(argtuple_to_cdeclargs(args))
+                src.write_ccode(CC_CB)
 
-            # body
+                # body
 
-            src.write_ccode(CCode('\n{\n'))
-            body = src.pop_fn_body()
-            src.write_ccode(body)
-            src.write_ccode(CCode('\n}\n'))
+                src.write_ccode(CCode('\n{\n'))
+                body = src.pop_fn_body()
+                src.write_ccode(body)
+                src.write_ccode(CCode('\n}\n'))
 
-        elif metatype == MT_FN_DEC:
+            elif metatype == MT_FN_DEC:
 
-            fn_name, ret_type = src.pop_fn_name_and_returntype()
-            src.register_function_declaration(fn_name)
+                fn_name, ret_type = src.pop_fn_name_and_returntype()
+                src.register_function_declaration(fn_name)
 
-            c_fn_name = varname_to_ccode(fn_name)
+                c_fn_name = varname_to_ccode(fn_name)
 
-            c_ret_type = type_to_ccode(ret_type)
+                c_ret_type = type_to_ccode(ret_type)
 
-            fn_args = src.pop_fn_dec_args()
+                fn_args = src.pop_fn_dec_args()
 
-            # TODO missing CC_WARNUNUSEDRESULT_SPACE
-            # removed for now until I make a proper error handling system
-            src.write_ccode(c_ret_type)
-            src.write_ccode(CC_SPACE)
-            src.write_ccode(c_fn_name)
-            src.write_ccode(CC_OB)
-            src.write_ccode(fn_args) # we could have used `()` but unfortunately this doesnt work for stdlib fncs (line printf)
-            src.write_ccode(CC_CB)
-            src.write_ccode(CC_SEMICOLON_NEWLINE)
+                # TODO missing CC_WARNUNUSEDRESULT_SPACE
+                # removed for now until I make a proper error handling system
+                src.write_ccode(c_ret_type)
+                src.write_ccode(CC_SPACE)
+                src.write_ccode(c_fn_name)
+                src.write_ccode(CC_OB)
+                src.write_ccode(fn_args) # we could have used `()` but unfortunately this doesnt work for stdlib fncs (line printf)
+                src.write_ccode(CC_CB)
+                src.write_ccode(CC_SEMICOLON_NEWLINE)
 
-        else:
-            
-            src.err(f'unknown metatype `{metatype}`; valid metatypes are {METATYPES}')
-
-    src.end_of_compilation_checks()
+            else:
+                
+                src.err(f'unknown metatype `{metatype}`; valid metatypes are {METATYPES}')
 
     term(['gcc', '-Werror', '-Wextra', '-Wall', '-pedantic', '-Wfatal-errors', '-Wshadow', '-fwrapv', '-o', FILE_EXECUTABLE, FILE_TMP_OUTPUT])
 
