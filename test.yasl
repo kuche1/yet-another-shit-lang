@@ -1,13 +1,22 @@
 
-// fn fuck[]{
+// fn asdfg[]{
 //     return 5;
 // }
 
 fn main:int [argc:int argv:char**]
 {
-    printf("hello\n");
-    printf("argc=%d\n", argc);
-    printf("argv=%p\n", (void *) argv);
-    // fuck();
-    return 0;
+    // printf("hello\n");
+    // printf("argc=%d\n", argc);
+    // printf("argv=%p\n", (void *) argv);
+
+    // asdfg();
+
+    // val a:int = 5
+
+    // return 0;
+
+
+    printf["hello\n"]
+
+    // return 0;
 }

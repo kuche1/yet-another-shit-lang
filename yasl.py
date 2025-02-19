@@ -23,7 +23,10 @@ FN_BODY_END = '}'
 
 VAR_TYPE_SEP = ':'
 
-VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP]
+TUPLE_BEGIN = FN_ARG_BEGIN
+TUPLE_END = FN_ARG_END
+
+VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END]
 
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
@@ -120,12 +123,31 @@ def pop_var_metatype(src:str) -> tuple[str, VarMetatype]:
 
     return src, mt
 
+# pop: tuple
+
+def pop_tuple(src:str) -> tuple[str, tuple[str, ...]]:
+    # TODO we're not taking care of string
+
+    src, tuple_begin = pop_var_name(src, justreturnif=TUPLE_BEGIN)
+    assert tuple_begin == TUPLE_BEGIN
+
+    the_tuple = []
+    while True:
+        src, item = pop_var_name(src, justreturnif=TUPLE_END)
+        if item == TUPLE_END:
+            break
+        the_tuple.append(item)
+    return src, tuple(the_tuple)
+
 # pop: fn name
 
 def pop_fn_name_and_returntype(src:str) -> tuple[str, tuple[str, str]]:
     src, name_and_returntype = pop_var_name_and_type(src)
     assert isinstance(name_and_returntype, tuple) # make mypy happy
     return src, name_and_returntype
+
+def pop_fn_name(src:str, orr:None|str=None) -> tuple[str, str]:
+    return pop_var_name(src, orr)
 
 # pop: fn arg
 
@@ -134,7 +156,7 @@ def pop_fn_arg_begin(src:str) -> str:
     assert fn_arg_begin == FN_ARG_BEGIN
     return src
 
-def pop_fn_arg_or_end(src:str) -> tuple[str, None|tuple[str,str]]:
+def pop_fn_def_arg_or_end(src:str) -> tuple[str, None|tuple[str,str]]:
     src, name_and_type = pop_var_name_and_type(src, just_return_if_varname_is=FN_ARG_END)
     if name_and_type == FN_ARG_END:
         return src, None
@@ -144,17 +166,20 @@ def pop_fn_arg_or_end(src:str) -> tuple[str, None|tuple[str,str]]:
     
     return src, name_and_type
 
-def pop_fn_args(src:str) -> tuple[str, tuple[tuple[str,str], ...]]:
+def pop_fn_def_args(src:str) -> tuple[str, tuple[tuple[str,str], ...]]:
     src = pop_fn_arg_begin(src)
 
     args = []
     while True:
-        src, arg = pop_fn_arg_or_end(src)
+        src, arg = pop_fn_def_arg_or_end(src)
         if arg is None:
             break
         args.append(arg)
 
     return src, tuple(args)
+
+def pop_fn_call_args(src:str) -> tuple[str, tuple[str, ...]]:
+    return pop_tuple(src)
 
 # pop: fn body
 
@@ -170,14 +195,14 @@ def pop_fn_body(src:str) -> tuple[str, str]:
 
     data = ''
     while True:
-        ch = src[0]
-        src = src[1:]
-
-        if len(ch) == 0:
-            assert False
-        if ch == FN_BODY_END:
+        src, fn_name = pop_fn_name(src, orr=FN_BODY_END)
+        if fn_name == FN_BODY_END:
             break
-        data += ch
+
+        src, fn_call_args = pop_fn_call_args(src)
+
+        data += f'{fn_name}({','.join(fn_call_args)});\n'
+
     return src, data
 
 # main
@@ -219,7 +244,7 @@ def main() -> None:
 
                     f_out.write('(')
 
-                    yasl_src, args = pop_fn_args(yasl_src)
+                    yasl_src, args = pop_fn_def_args(yasl_src)
 
                     args_str = ''
 
