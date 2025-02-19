@@ -8,12 +8,14 @@
 from typing import Literal
 from typing import Any
 import subprocess
+import shutil
 import sys
 import os
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 FOLDER_TMP = os.path.join(HERE, 'tmp')
 FILE_INPUT = os.path.join(HERE, 'test.yasl')
+FILE_TMP_OUTPUT_UGLY = os.path.join(FOLDER_TMP, 'code_ugly.c')
 FILE_TMP_OUTPUT = os.path.join(FOLDER_TMP, 'code.c')
 FILE_EXECUTABLE = os.path.join(FOLDER_TMP, 'executable')
 
@@ -104,9 +106,8 @@ def ccodecat(*args:CCode) -> CCode: # TODO! delete this, it was created to enfor
 def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
     ret = CCode('')
 
-    for arg_name in args:
-        c_arg_name = varname_to_ccode(arg_name)
-        ret += c_arg_name
+    for val in args:
+        ret += value_to_ccode(val)
         ret += CC_COMMA_SPACE
 
     ret.del_if_endswith(CC_COMMA_SPACE)
@@ -120,18 +121,15 @@ def argtuple_to_cdeclargs(args:tuple[tuple[str, str], ...]) -> CCode:
         ret += CCode('void')
     else:
         for arg_name, arg_type in args:
-            c_arg_name = varname_to_ccode(arg_name)
-            c_arg_type = type_to_ccode(arg_type)
-            ret += c_arg_type
+            ret += type_to_ccode(arg_type)
             ret += CC_SPACE
-            ret += c_arg_name
+            ret += varname_to_ccode(arg_name)
             ret += CC_COMMA_SPACE
         ret.del_if_endswith(CC_COMMA_SPACE)
 
     return ret
 
 def varname_to_ccode(name:str) -> CCode:
-    # TODO! we're using this in more places than we should - in the future this is going to fuck strings over
     # maybe we could omit the `$` to make the code a bit more readable and compliant
     name = name.replace('-', '$M$')
     name = name.replace('+', '$P$')
@@ -140,7 +138,7 @@ def varname_to_ccode(name:str) -> CCode:
     return CCode(name)
 
 def value_to_ccode(value:str) -> CCode:
-    # TODO what about strings ?
+    # TODO what about strings ? this is a fucky implementation
     return varname_to_ccode(value)
 
 def type_to_ccode(typ:str) -> CCode:
@@ -311,7 +309,7 @@ class Src:
             return value_to_ccode(value_or_fnccall)
         
         # is a function call
-        c_fn_name = varname_to_ccode(value_or_fnccall)
+        c_fn_name = varname_to_ccode(value_or_fnccall) # TODO if we are to implement anonymous functions this needs to change
         c_fn_args = ctuple_to_ccallargs(fncargs)
         ret = ccodecat(c_fn_name, CC_OB, c_fn_args, CC_CB)
         return ret
@@ -441,10 +439,8 @@ class Src:
             # ret
 
             if statement_begin == ST_BEG_RET:
-                ret_val = self.pop_var_name()
-
                 ret = CCode('return ')
-                ret += varname_to_ccode(ret_val)
+                ret += self.pop_value() # TODO! fucking annotate `pop_var_name` and all those shits with YCodeValue or YCodeVarname or some shit like that
                 ret += CC_SEMICOLON_NEWLINE
                 return ret
             
@@ -580,7 +576,7 @@ def main() -> None:
 
     os.makedirs(FOLDER_TMP, exist_ok=True)
 
-    with Src(FILE_INPUT, FILE_TMP_OUTPUT) as src:
+    with Src(FILE_INPUT, FILE_TMP_OUTPUT_UGLY) as src:
 
         # f_out.write('#include <stdio.h>\n')
         # f_out.write('\n')
@@ -644,6 +640,11 @@ def main() -> None:
             else:
                 
                 src.err(f'unknown metatype `{metatype}`; valid metatypes are {METATYPES}')
+
+    shutil.copyfile(FILE_TMP_OUTPUT_UGLY, FILE_TMP_OUTPUT)
+    # term(['clang-format', '-i', FILE_TMP_OUTPUT]) # uses 2 spaces
+    term(['astyle', FILE_TMP_OUTPUT]) # ok
+    # term(['uncrustify', FILE_TMP_OUTPUT]) # requires a config file
 
     term(['gcc', '-Werror', '-Wextra', '-Wall', '-pedantic', '-Wfatal-errors', '-Wshadow', '-fwrapv', '-o', FILE_EXECUTABLE, FILE_TMP_OUTPUT])
 
