@@ -86,6 +86,7 @@ CC_ASSIGN = CCode(' = ')
 CC_OB = CCode('(')
 CC_CB = CCode(')')
 CC_COMMA_SPACE = CCode(', ')
+CC_WARNUNUSEDRESULT_SPACE = CCode('__attribute__((warn_unused_result)) ')
 
 # fnc
 
@@ -601,7 +602,7 @@ def main() -> None:
             fn_name, ret_type = src.pop_fn_name_and_returntype()
             src.register_function_declaration(fn_name)
 
-            src.write_ccode(CCode('__attribute__((warn_unused_result)) ')) # `-Wunused-result` doesn't do the trick # TODO! make into define and find all the fucking casts
+            src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
             src.write_ccode(type_to_ccode(ret_type))
             src.write_ccode(CC_SPACE)
             src.write_ccode(varname_to_ccode(fn_name))
@@ -631,7 +632,7 @@ def main() -> None:
 
             fn_args = src.pop_fn_dec_args()
 
-            # TODO missing __attribute__((warn_unused_result))
+            # TODO missing CC_WARNUNUSEDRESULT_SPACE
             # removed for now until I make a proper error handling system
             src.write_ccode(c_ret_type)
             src.write_ccode(CC_SPACE)
