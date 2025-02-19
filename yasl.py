@@ -12,34 +12,49 @@ FILE_INPUT = os.path.join(HERE, 'test.yasl')
 FILE_TMP_OUTPUT = os.path.join(FOLDER_TMP, 'code.c')
 FILE_EXECUTABLE = os.path.join(FOLDER_TMP, 'executable')
 
-WHITESPACE = [' ', '\t', '\n']
-
 FN_ARG_BEGIN = '['
 FN_ARG_END = ']'
-
-VAR_NAME_SEPARATORS = [FN_ARG_BEGIN, FN_ARG_END]
 
 FN_BODY_BEGIN = '{'
 FN_BODY_END = '}'
 
+WHITESPACE = [' ', '\t', '\n']
+
+VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END]
+
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
 
+def pop_whitespace(src:str) -> str:
+    # TODo use this where needed
+    # TODO handle comments
+
+    while True:
+        if len(src) == 0:
+            break
+        
+        ch = src[0]
+
+        if ch in WHITESPACE:
+            src = src[1:]
+            continue
+    
+        break
+    
+    return src
+
 def pop_var_name(src:str, justreturnif:None|str=None) -> tuple[str, str]:
+    src = pop_whitespace(src)
+
     data = ''
 
     while True:
         ch = src[0]
         src = src[1:]
 
-        if ch == justreturnif:
-            if len(data) == 0:
-                return src, justreturnif
-
-        if ch in WHITESPACE:
-            if len(data):
-                break
-            continue
+        if data + ch == justreturnif:
+            data += ch
+            break
 
         if ch in VAR_NAME_SEPARATORS:
             src = ch + src
@@ -85,7 +100,6 @@ def pop_fn_args(src:str) -> tuple[str, tuple[str, ...]]:
     args = []
     while True:
         src, arg = pop_fn_arg_or_end(src)
-        print(f'{arg=}')
         if arg == FN_ARG_END:
             break
         args.append(arg)
@@ -121,58 +135,71 @@ with open(FILE_INPUT, 'r') as f_in:
 
 with open(FILE_TMP_OUTPUT, 'w') as f_out:
 
-    yasl_src, metatype = pop_var_metatype(yasl_src)
+    f_out.write('#include <stdio.h>\n')
+    f_out.write('\n')
 
-    match metatype:
+    while True:
 
-        case Var_metatype.fn:
-            print('yeee function')
+        yasl_src = pop_whitespace(yasl_src)
 
-            # return type
+        if len(yasl_src) == 0:
+            break
 
-            f_out.write('int ')
+        yasl_src, metatype = pop_var_metatype(yasl_src)
 
-            # name
+        match metatype:
 
-            print('getting function name')
-            yasl_src, name = pop_var_name(yasl_src)
-            print('got function name')
-            f_out.write(name)
+            case Var_metatype.fn:
+                print('yeee function')
 
-            # args
+                # return type
 
-            f_out.write('(')
+                f_out.write('__attribute__((warn_unused_result)) int ')
+                # `-Wunused-result` doesn't do the trick
 
-            print('getting function args')
-            yasl_src, args = pop_fn_args(yasl_src)
-            print('got fnc args')
+                # name
 
-            args_str = ''
-            for arg in args:
-                args_str += f'int {arg}, '
-            if args_str.endswith(', '):
-                args_str = args_str[:-2]
-            f_out.write(args_str)
+                yasl_src, name = pop_var_name(yasl_src)
+                f_out.write(name)
 
-            f_out.write(')')
+                # args
 
-            # body
+                f_out.write('(')
 
-            f_out.write('\n{\n')
-            yasl_src, body = pop_fn_body(yasl_src)
-            f_out.write(body)
-            f_out.write('\n}\n')
+                yasl_src, args = pop_fn_args(yasl_src)
 
-        case Var_metatype.var:
-            print('yee var')
-            raise NotImplementedError()
+                args_str = ''
 
-        case Var_metatype.val:
-            print('yeee val')
-            raise NotImplementedError()
+                if len(args) == 0:
+                    args_str += 'void'
+                else:
+                    for arg in args:
+                        args_str += f'int {arg}, '
 
-        case _:
-            assert False
+                if args_str.endswith(', '):
+                    args_str = args_str[:-2]
+
+                f_out.write(args_str)
+
+                f_out.write(')')
+
+                # body
+
+                f_out.write('\n{\n')
+                yasl_src, body = pop_fn_body(yasl_src)
+                f_out.write(body)
+                f_out.write('\n}\n')
+
+            case Var_metatype.var:
+                print('yee var')
+                raise NotImplementedError()
+
+            case Var_metatype.val:
+                print('yeee val')
+                raise NotImplementedError()
+
+            case _:
+                assert False
 
 term(['gcc', '-Werror', '-Wextra', '-Wall', '-pedantic', '-Wfatal-errors', '-Wshadow', '-fwrapv', '-o', FILE_EXECUTABLE, FILE_TMP_OUTPUT])
 

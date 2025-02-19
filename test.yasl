@@ -1,5 +1,10 @@
 
-fn main[arg1 arg2 arg3]{
+fn fuck[]{
+    return 5;
+}
+
+fn main[]{
     printf("hello\n");
+    fuck();
     return 0;
 }
