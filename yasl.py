@@ -37,7 +37,7 @@ STRING = "'"
 
 FTS_NO_ERR = VAR_TYPE_SEP
 FTS_ERR = '!'
-FUNCTION_TYPE_SEPARATORS = [FTS_NO_ERR, FTS_ERR]
+FUNCTION_TYPE_SEPARATORS = [FTS_NO_ERR, FTS_ERR] # needs to be of length at least 1
 
 VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END] + [STRING] + FUNCTION_TYPE_SEPARATORS
 # TODO! rename to SEPARATOR or something similar
@@ -257,14 +257,14 @@ class Src:
 
     # pop: type separator
 
-    def pop_var_type_sep(self, var_name:str) -> None: # TODO!!! see where it's used and replace with `pop_fn_type_sep` where appropriate
+    def pop_var_type_sep(self, var_name:str) -> None:
         sep = self.pop_var_name(orr=VAR_TYPE_SEP)
         if sep != VAR_TYPE_SEP:
             self.unpop_var_name(sep)
             self.err(f'variable `{var_name}`: expected a type seperator `{VAR_TYPE_SEP}`, instead got `{sep}`')
     
     def pop_fn_type_sep(self, name:str) -> bool:
-        for fts in FUNCTION_TYPE_SEPARATORS: # TODO!!! add comment saying that this needs to be of length at least 1
+        for fts in FUNCTION_TYPE_SEPARATORS:
             sep = self.popif_var_name(orr=fts)
             if sep == fts:
                 if sep == FTS_NO_ERR:
@@ -285,21 +285,28 @@ class Src:
     # pop: type
 
     def pop_type(self) -> str:
-        data = ''
-
-        while not self.no_more_code():
-            ch = self.src[0]
-            self.src = self.src[1:]
-
-            if ch in WHITESPACE:
-                break
-        
-            data += ch
-                
-        if len(data) == 0:
+        # TODO this turned out to be exactly the same as `pop_var_name` except with a few bugs
+        ret = self.popif_var_name(orr=None)
+        if ret is None:
             self.err('a type needs to be specified')
+        return ret
 
-        return data
+        # data = ''
+
+        # while not self.no_more_code():
+        #     ch = self.src[0]
+        #     self.src = self.src[1:]
+
+        #     if ch in VAR_NAME_SEPARATORS:
+        #         self.src = ch + self.src
+        #         break
+        
+        #     data += ch
+                
+        # if len(data) == 0:
+        #     self.err('a type needs to be specified')
+
+        # return data
 
     def pop_c_type(self, name:str) -> CCode:
         data:CCode = CCode('')
@@ -367,7 +374,8 @@ class Src:
 
         self.pop_var_type_sep(name)
 
-        typ = self.pop_var_name()
+        typ = self.pop_type()
+        print(f'dbg: pop_var_name_and_type_orr: {typ=}')
 
         return name, typ
 
@@ -628,10 +636,8 @@ class Src:
 
     def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[str, bool, str]:
         name = self.pop_var_name()
-        print(f'dbg: pop_fn_name_and_canreterr_and_rettype: {name=}')
         canreterr = self.pop_fn_type_sep(name)
-        print(f'dbg: pop_fn_name_and_canreterr_and_rettype: {canreterr=}')
-        typ = self.pop_type() # TODO!!! use this in get_name_and_type or whatever its called
+        typ = self.pop_type()
         return name, canreterr ,typ
 
     # pop: fn arg
@@ -672,11 +678,14 @@ class Src:
         return tuple(args)
 
     def pop_fn_def_args(self) -> tuple[tuple[str,str], ...]:
+        print(f'dbg: pop_fn_def_args: before popping fn arg begin `{self.src[:20]}`')
         self.pop_fn_arg_begin()
+        print(f'dbg: pop_fn_def_args: after  popping fn arg begin`{self.src[:20]}`')
 
         args = []
         while True:
             arg = self.pop_fn_def_arg_or_end()
+            print(f'dbg: pop_fn_def_args: `{arg=}`')
             if arg is None:
                 break
             args.append(arg)
@@ -769,8 +778,11 @@ def main() -> None:
 
                 # args
 
+                print('dbg: 3')
                 src.write_ccode(CC_OB)
+                print('dbg: 4')
                 args = src.pop_fn_def_args()
+                print('dbg: 5')
                 src.write_ccode(argtuple_to_cdeclargs(args))
                 src.write_ccode(CC_CB)
 
