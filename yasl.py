@@ -216,9 +216,9 @@ class Src:
         assert not isinstance(nametype_orr, str)
         return nametype_orr
 
-    # pop: var value
+    # pop: value
 
-    def pop_var_value_orr(self, orr:None|str) -> str:
+    def pop_value_orr(self, orr:None|str) -> str:
         value_or_fnccall = self.pop_var_name(orr=orr)
         if value_or_fnccall == orr:
             return value_or_fnccall
@@ -233,8 +233,8 @@ class Src:
         c_fn_args = argtuple_to_ccallargs(fncargs)
         return f'{c_fn_name}({c_fn_args})'
 
-    def pop_var_value(self) -> str:
-        return self.pop_var_value_orr(None)
+    def pop_value(self) -> str:
+        return self.pop_value_orr(None)
 
     # pop: var metatype
 
@@ -259,7 +259,7 @@ class Src:
 
         the_tuple = []
         while True:
-            item = self.pop_var_value_orr(orr=TUPLE_END)
+            item = self.pop_value_orr(orr=TUPLE_END)
             if item == TUPLE_END:
                 break
             the_tuple.append(item)
@@ -370,7 +370,7 @@ class Src:
             if statement_begin in [ST_BEG_VAL, ST_BEG_VAR]:
                 var_name, var_type = self.pop_var_name_and_type()
                 var_name = varname_to_cvarname(var_name)
-                var_value = self.pop_var_value()
+                var_value = self.pop_value()
                 const_prefix = 'const ' if statement_begin == ST_BEG_VAL else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
                 return f'{const_prefix}{var_type} {var_name} = {var_value};\n'
 
@@ -396,7 +396,7 @@ class Src:
                 var = self.pop_var_name()
                 self.pop_var_type_sep(var)
                 new_c_type = self.pop_c_type()
-                cast_from = self.pop_var_value()
+                cast_from = self.pop_value()
                 return f'{new_c_type} {var} = ({new_c_type}) {cast_from};\n' # TODO and what if it needs to be a constant ?
 
             # fn call
