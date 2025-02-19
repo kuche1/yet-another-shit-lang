@@ -51,7 +51,9 @@ MACRO_BODY_END = ')'
 # right now those CAN be part of a variable name
 # I'm intentionally keeping this here, just to see what happens
 
-# c code
+###
+### c code
+###
 
 # CCode = typing.NewType("CCode", str)
 # # even using this, mypy still allows passing `CCode` to functions requiring a `str` argument
@@ -91,10 +93,14 @@ CC_CB = CCode(')')
 CC_COMMA_SPACE = CCode(', ')
 CC_WARNUNUSEDRESULT_SPACE = CCode('__attribute__((warn_unused_result)) ')
 
-# fnc
+###
+### fncs
+###
 
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
+
+# str to CCode converters
 
 def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
     ret = CCode('')
@@ -132,6 +138,7 @@ def varname_to_ccode(name:str) -> CCode:
 
 def value_to_ccode(value:str) -> CCode:
     # TODO! what about strings ? this is a fucky implementation
+
     return varname_to_ccode(value)
 
 def type_to_ccode(typ:str) -> CCode:
@@ -145,7 +152,9 @@ def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
     ret.del_if_startswith(CC_COMMA_SPACE)
     return ret
 
-# class
+###
+### class src
+###
 
 class Src:
 
@@ -581,8 +590,9 @@ class Src:
 
         return data
 
-
-# main
+###
+### main
+###
 
 def main() -> None:
 
