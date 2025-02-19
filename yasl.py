@@ -353,6 +353,7 @@ class Src:
         return data
 
     # TODO this name is missleading, it's not really just "variable name", see where its used
+    # TODO! this has been fucking me over for some time now...
     def pop_var_name(self, *, orr:None|str=None) -> str:
         name = self.popif_var_name(orr=orr)
         if name is None:

@@ -13,7 +13,7 @@
 // TODO call C function without any checks
 // @printf[]
 
-// TODO? make all fnc args const (we're going to eventually run into a problem in the future if we don't fix thos)
+// TODO? make all fnc args const (we're going to eventually run into a problem in the future if we don't fix this)
 
 // TODO not implemented
 // macro add [a b]
@@ -63,7 +63,7 @@ fn main:int [argc:int argv_cpp:char**]
     val fib(2):int add-int[fib(0) fib(1)]
     printf['fib(2)=%d\n' fib(2)]
 
-    test123[]
+    test123[] // TODO need to add syntax like `!test123[]` that adds a runtime assert
 
     ret 0
 }
