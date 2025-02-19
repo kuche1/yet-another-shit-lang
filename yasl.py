@@ -1,9 +1,11 @@
 #! /usr/bin/env python3
 
+# TODO add string support so that printf doesnt shit itself occasionally
+# TODO write function body inplace instead of returning a billion times
+
 from typing import Literal
-from typing import cast
+# from typing import NewType
 import subprocess
-import typing
 import sys
 import os
 
@@ -48,48 +50,82 @@ MACRO_BODY_END = ')'
 
 # c code
 
-CCode = typing.NewType("CCode", str)
+# CCode = typing.NewType("CCode", str)
+# # even using this, mypy still allows passing `CCode` to functions requiring a `str` argument
+
+# I really didn't want to do this but
+# I couldn't find a way to get the compiler
+# to act more strictly
+class CCode:
+
+    def __init__(self, val:str):
+        self.val = val
+
+    def __iadd__(self, other:'CCode') -> 'CCode':
+        self.val += other.val
+        return self
+    
+    def __repr__(self) -> str:
+        assert False, 'CCode is not to be used with __repr__'
+        return 'ERROR'
+
+    def empty(self) -> bool:
+        return len(self.val) == 0
+
+    def del_if_endswith(self, end:'CCode') -> None:
+        if self.val.endswith(end.val):
+            self.val = self.val[:-len(end.val)]
+
+    def del_if_startswith(self, start:'CCode') -> None:
+        if self.val.startswith(start.val):
+            self.val = self.val[len(start.val):]
 
 CC_SPACE = CCode(' ')
 CC_SEMICOLON_NEWLINE = CCode(';\n')
 CC_ASSIGN = CCode(' = ')
 CC_OB = CCode('(')
 CC_CB = CCode(')')
+CC_COMMA_SPACE = CCode(', ')
 
 # fnc
 
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
 
-def ccodecat(*arg:CCode) -> CCode:
-    return CCode(''.join(arg))
+def ccodecat(*args:CCode) -> CCode: # TODO! delete this, it was created to enforce type safety anyways
+    ret = ''
+    for arg in args:
+        ret += arg.val
+    return CCode(ret)
 
 def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
-    ret = ''
+    ret = CCode('')
 
     for arg_name in args:
         c_arg_name = varname_to_ccode(arg_name)
-        ret += f'{c_arg_name}, '
+        ret += c_arg_name
+        ret += CC_COMMA_SPACE
 
-    if ret.endswith(', '):
-        ret = ret[:-2]
+    ret.del_if_endswith(CC_COMMA_SPACE)
 
-    return cast(CCode, ret)
+    return ret
 
 def argtuple_to_cdeclargs(args:tuple[tuple[str, str], ...]) -> CCode:
-    ret = ''
+    ret = CCode('')
 
     if len(args) == 0:
-        ret += 'void'
+        ret += CCode('void')
     else:
         for arg_name, arg_type in args:
-            arg_name = varname_to_ccode(arg_name)
-            arg_type = type_to_ccode(arg_type)
-            ret += f'{arg_type} {arg_name}, '
-        if ret.endswith(', '):
-            ret = ret[:-2]
+            c_arg_name = varname_to_ccode(arg_name)
+            c_arg_type = type_to_ccode(arg_type)
+            ret += c_arg_type
+            ret += CC_SPACE
+            ret += c_arg_name
+            ret += CC_COMMA_SPACE
+        ret.del_if_endswith(CC_COMMA_SPACE)
 
-    return cast(CCode, ret)
+    return ret
 
 def varname_to_ccode(name:str) -> CCode:
     # TODO! we're using this in more places than we should - in the future this is going to fuck strings over
@@ -98,22 +134,20 @@ def varname_to_ccode(name:str) -> CCode:
     name = name.replace('+', '$P$')
     name = name.replace('(', '$OB$')
     name = name.replace(')', '$CB$')
-    return cast(CCode, name)
+    return CCode(name)
 
 def value_to_ccode(value:str) -> CCode:
     # TODO what about strings ?
     return varname_to_ccode(value)
 
 def type_to_ccode(typ:str) -> CCode:
-    return cast(CCode, typ)
+    return CCode(typ)
 
 def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
     ret = CCode('')
     for arg in args:
-        if len(ret):
-            ret = ccodecat(ret, CCode(', '), arg)
-        else:
-            ret = arg
+        ret = ccodecat(ret, CC_COMMA_SPACE, arg)
+    ret.del_if_startswith(CC_COMMA_SPACE)
     return ret
 
 # class
@@ -137,7 +171,7 @@ class Src:
         return len(self.src) == 0
     
     def write_ccode(self, code:CCode) -> None:
-        self.file_out.write(code)
+        self.file_out.write(code.val)
     
     def err(self, err_msg:str) -> None:
         print(f'ERROR: file `{self.file_in}`: line {self.line_number}: {err_msg}', file=sys.stderr)
@@ -278,7 +312,6 @@ class Src:
         c_fn_name = varname_to_ccode(value_or_fnccall)
         c_fn_args = ctuple_to_ccallargs(fncargs)
         ret = ccodecat(c_fn_name, CC_OB, c_fn_args, CC_CB)
-        print(f'dbg: pop_value_orr: {ret=}')
         return ret
 
     def pop_value(self) -> CCode:
@@ -382,7 +415,7 @@ class Src:
 
         return self.pop_macro_body()
 
-    def pop_fn_call_args(self, fn_name:str) -> tuple[str, ...]:
+    def pop_fn_call_args(self, fn_name:str) -> tuple[CCode, ...]:
         return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
 
     # pop: fn body
@@ -406,59 +439,62 @@ class Src:
             # ret
 
             if statement_begin == ST_BEG_RET:
-                val_to_return = self.pop_var_name()
-                val_to_return = varname_to_ccode(val_to_return)
-                return CCode(f'return {val_to_return};')
+                ret_val = self.pop_var_name()
+
+                ret = CCode('return ')
+                ret += varname_to_ccode(ret_val)
+                ret += CC_SEMICOLON_NEWLINE
+                return ret
             
             # val/var
 
             if statement_begin in [ST_BEG_VAL, ST_BEG_VAR]:
                 var_name, var_type = self.pop_var_name_and_type()
 
-                var_name = varname_to_ccode(var_name)
+                c_var_name = varname_to_ccode(var_name)
 
-                var_type = type_to_ccode(var_type)
+                c_var_type = type_to_ccode(var_type)
 
-                var_value = self.pop_value()
+                c_var_value = self.pop_value()
 
-                const_prefix = 'const ' if statement_begin == ST_BEG_VAL else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
-                const_prefix = CCode(const_prefix)
+                const_prefix = CCode('const ') if statement_begin == ST_BEG_VAL else CCode('') # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
 
                 return ccodecat(
-                    const_prefix, var_type, CC_SPACE, var_name,
+                    const_prefix, c_var_type, CC_SPACE, c_var_name,
                     CC_ASSIGN,
-                    var_value, CC_SEMICOLON_NEWLINE)
+                    c_var_value, CC_SEMICOLON_NEWLINE)
 
             # variable increase/decrease
 
             if statement_begin in [ST_BEG_INC, ST_BEG_DEC]:
                 var_name = self.pop_var_name()
-                var_name = varname_to_ccode(var_name)
+                c_var_name = varname_to_ccode(var_name)
 
-                value = self.pop_value()
+                c_value = self.pop_value()
 
-                change = '+=' if statement_begin == ST_BEG_INC else '-='
-                change = CCode(change)
+                c_change = CCode('+=') if statement_begin == ST_BEG_INC else CCode('-=')
 
                 return ccodecat(
-                    var_name,
-                    CC_SPACE, change, CC_SPACE,
-                    value, CC_SEMICOLON_NEWLINE)
+                    c_var_name,
+                    CC_SPACE, c_change, CC_SPACE,
+                    c_value, CC_SEMICOLON_NEWLINE)
             
             # cast
 
             if statement_begin == ST_BEG_CAST:
                 var = self.pop_var_name()
-                var = varname_to_ccode(var)
+                c_var = varname_to_ccode(var)
 
+                print(f'dbg: {self.src[:20]=}')
                 self.pop_var_type_sep(var)
+                print(f'dbg: {self.src[:20]=}')
 
-                new_c_type = self.pop_c_type()
+                new_c_type = self.pop_c_type(var)
 
                 cast_from = self.pop_value()
 
                 return ccodecat(
-                    new_c_type, CC_SPACE, var, # TODO and what if it needs to be a constant ?
+                    new_c_type, CC_SPACE, c_var, # TODO and what if it needs to be a constant ?
                     CC_ASSIGN,
                     CC_OB, new_c_type, CC_CB, CC_SPACE, cast_from, CC_SEMICOLON_NEWLINE)
 
@@ -469,8 +505,8 @@ class Src:
 
                 c_fn_name = varname_to_ccode(statement_begin)
 
-                fn_call_args = self.pop_fn_call_args(statement_begin)
-                c_fn_args = argtuple_to_ccallargs(fn_call_args)
+                fn_call_args_ctuple = self.pop_fn_call_args(statement_begin)
+                c_fn_args = ctuple_to_ccallargs(fn_call_args_ctuple)
 
                 return ccodecat(c_fn_name, CC_OB, c_fn_args, CC_CB, CC_SEMICOLON_NEWLINE)
             
@@ -487,9 +523,6 @@ class Src:
             if body_element_or_end is None:
                 break
 
-            if body_element_or_end == 'const int fib$OB$2$CB$ = add$M$int$OB$fib$OB$0$CB$, fib$OB$1$CB$$CB$;\n':
-                print('~~~ ', end='')
-            print(f'dbg: pop_fn_body: {body_element_or_end=}')
             body_element:CCode = body_element_or_end
 
             data = ccodecat(data, body_element)
@@ -522,7 +555,7 @@ class Src:
 
     # pop: c related
 
-    def pop_c_type(self) -> CCode:
+    def pop_c_type(self, name:str) -> CCode:
         data:CCode = CCode('')
 
         while not self.no_more_code():
@@ -532,9 +565,11 @@ class Src:
             if ch in WHITESPACE:
                 break
         
-            data = ccodecat(data, CCode(ch))
+            data += CCode(ch)
+            print(f'{data.val=}')
                 
-        assert len(data)
+        if data.empty():
+            self.err(f'a C type needs to be specified for `{name}`')
 
         return data
 
@@ -566,41 +601,41 @@ def main() -> None:
             fn_name, ret_type = src.pop_fn_name_and_returntype()
             src.register_function_declaration(fn_name)
 
-            src.write_ccode(cast(CCode, '__attribute__((warn_unused_result)) ')) # `-Wunused-result` doesn't do the trick
+            src.write_ccode(CCode('__attribute__((warn_unused_result)) ')) # `-Wunused-result` doesn't do the trick # TODO! make into define and find all the fucking casts
             src.write_ccode(type_to_ccode(ret_type))
-            src.write_ccode(cast(CCode, ' '))
+            src.write_ccode(CC_SPACE)
             src.write_ccode(varname_to_ccode(fn_name))
 
             # args
 
-            src.write_ccode(cast(CCode, '('))
+            src.write_ccode(CC_OB)
             args = src.pop_fn_def_args()
             src.write_ccode(argtuple_to_cdeclargs(args))
-            src.write_ccode(cast(CCode, ')'))
+            src.write_ccode(CC_CB)
 
             # body
 
-            src.write_ccode(cast(CCode, '\n{\n'))
+            src.write_ccode(CCode('\n{\n'))
             body = src.pop_fn_body()
             src.write_ccode(body)
-            src.write_ccode(cast(CCode, '\n}\n'))
+            src.write_ccode(CCode('\n}\n'))
 
         elif metatype == MT_FN_DEC:
 
             fn_name, ret_type = src.pop_fn_name_and_returntype()
             src.register_function_declaration(fn_name)
 
-            fn_name = varname_to_ccode(fn_name)
+            c_fn_name = varname_to_ccode(fn_name)
 
-            ret_type = type_to_ccode(ret_type)
+            c_ret_type = type_to_ccode(ret_type)
 
             fn_args = src.pop_fn_dec_args()
 
             # TODO missing __attribute__((warn_unused_result))
             # removed for now until I make a proper error handling system
-            src.write_ccode(ret_type)
+            src.write_ccode(c_ret_type)
             src.write_ccode(CC_SPACE)
-            src.write_ccode(fn_name)
+            src.write_ccode(c_fn_name)
             src.write_ccode(CC_OB)
             src.write_ccode(fn_args) # we could have used `()` but unfortunately this doesnt work for stdlib fncs (line printf)
             src.write_ccode(CC_CB)

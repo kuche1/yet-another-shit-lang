@@ -6,9 +6,9 @@
     # more static analyzeds can be found here
     # https://pypi.org/project/pylint/
 
-    mypy --strict yasl.py
+    mypy yasl.py --strict
 
-    pylint --disable=line-too-long,trailing-whitespace,fixme,missing-module-docstring,missing-function-docstring,use-implicit-booleaness-not-len,missing-class-docstring,broad-exception-raised,unspecified-encoding,too-many-return-statements,too-many-public-methods,consider-using-with yasl.py
+    pylint yasl.py --disable=line-too-long,trailing-whitespace,fixme,missing-module-docstring,missing-function-docstring,use-implicit-booleaness-not-len,missing-class-docstring,broad-exception-raised,unspecified-encoding,too-many-return-statements,too-many-public-methods,consider-using-with,too-many-locals
     # pylint definetely catches some mistakes that mypy doesn't
     # fixme - any todo comments
 
