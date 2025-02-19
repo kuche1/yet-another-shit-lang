@@ -1,7 +1,9 @@
 #! /usr/bin/env python3
 
+# TODO split this file
+# TODO fix all the `!` todos and a coupld of the regular ones
 # TODO write function body inplace instead of returning a billion times
-# TODo maybe I should give up on the stupid `fib(1)` variables and just use separators instead of that stupid `orr=`
+# TODO maybe I should give up on the stupid `fib(1)` variables and just use separators instead of that stupid `orr=`
 
 # from typing import NewType
 from typing import NoReturn
