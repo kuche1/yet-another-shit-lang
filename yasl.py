@@ -138,7 +138,6 @@ def varname_to_ccode(name:str) -> CCode:
 
 def value_to_ccode(value:str) -> CCode:
     # TODO! what about strings ? this is a fucky implementation
-
     return varname_to_ccode(value)
 
 def type_to_ccode(typ:str) -> CCode:
@@ -322,6 +321,7 @@ class Src:
         return ret
 
     def pop_value(self) -> CCode:
+        # TODO! and what about strungs ?
         ret = self.pop_value_orr(orr=None)
         assert ret is not True # make mypy happy
         return ret
