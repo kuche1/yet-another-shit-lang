@@ -3,10 +3,16 @@
 {
     set -euo pipefail
 
+    # more static analyzeds can be found here
+    # https://pypi.org/project/pylint/
+
     mypy --strict yasl.py
 
-    pylint yasl.py --disable=line-too-long,trailing-whitespace,fixme,missing-module-docstring,missing-function-docstring,use-implicit-booleaness-not-len,missing-class-docstring,broad-exception-raised,unspecified-encoding
+    pylint --disable=line-too-long,trailing-whitespace,fixme,missing-module-docstring,missing-function-docstring,use-implicit-booleaness-not-len,missing-class-docstring,broad-exception-raised,unspecified-encoding yasl.py
     # fixme - any todo comments
+
+    ruff check yasl.py
+    # no idea if this actually helps if you already have `mypy` and `pylint`
 
     echo '~~~~~~~~~~~~~~~~~~~~~~'
 
