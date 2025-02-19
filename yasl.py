@@ -97,12 +97,6 @@ CC_WARNUNUSEDRESULT_SPACE = CCode('__attribute__((warn_unused_result)) ')
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
 
-def ccodecat(*args:CCode) -> CCode: # TODO! delete this, it was created to enforce type safety anyways
-    ret = ''
-    for arg in args:
-        ret += arg.val
-    return CCode(ret)
-
 def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
     ret = CCode('')
 
@@ -147,7 +141,8 @@ def type_to_ccode(typ:str) -> CCode:
 def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
     ret = CCode('')
     for arg in args:
-        ret = ccodecat(ret, CC_COMMA_SPACE, arg)
+        ret += CC_COMMA_SPACE
+        ret += arg
     ret.del_if_startswith(CC_COMMA_SPACE)
     return ret
 
@@ -311,7 +306,11 @@ class Src:
         # is a function call
         c_fn_name = varname_to_ccode(value_or_fnccall) # TODO if we are to implement anonymous functions this needs to change
         c_fn_args = ctuple_to_ccallargs(fncargs)
-        ret = ccodecat(c_fn_name, CC_OB, c_fn_args, CC_CB)
+        ret = CCode('')
+        ret += c_fn_name
+        ret += CC_OB
+        ret += c_fn_args
+        ret += CC_CB
         return ret
 
     def pop_value(self) -> CCode:
@@ -457,10 +456,15 @@ class Src:
 
                 const_prefix = CCode('const ') if statement_begin == ST_BEG_VAL else CCode('') # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
 
-                return ccodecat(
-                    const_prefix, c_var_type, CC_SPACE, c_var_name,
-                    CC_ASSIGN,
-                    c_var_value, CC_SEMICOLON_NEWLINE)
+                ret = CCode('')
+                ret += const_prefix
+                ret += c_var_type
+                ret += CC_SPACE
+                ret += c_var_name
+                ret += CC_ASSIGN
+                ret += c_var_value
+                ret += CC_SEMICOLON_NEWLINE
+                return ret
 
             # variable increase/decrease
 
@@ -472,10 +476,12 @@ class Src:
 
                 c_change = CCode('+=') if statement_begin == ST_BEG_INC else CCode('-=')
 
-                return ccodecat(
-                    c_var_name,
-                    CC_SPACE, c_change, CC_SPACE,
-                    c_value, CC_SEMICOLON_NEWLINE)
+                ret = CCode('')
+                ret += c_var_name
+                ret += c_change
+                ret += c_value
+                ret += CC_SEMICOLON_NEWLINE
+                return ret
             
             # cast
 
@@ -483,18 +489,22 @@ class Src:
                 var = self.pop_var_name()
                 c_var = varname_to_ccode(var)
 
-                print(f'dbg: {self.src[:20]=}')
                 self.pop_var_type_sep(var)
-                print(f'dbg: {self.src[:20]=}')
 
                 new_c_type = self.pop_c_type(var)
 
                 cast_from = self.pop_value()
 
-                return ccodecat(
-                    new_c_type, CC_SPACE, c_var, # TODO and what if it needs to be a constant ?
-                    CC_ASSIGN,
-                    CC_OB, new_c_type, CC_CB, CC_SPACE, cast_from, CC_SEMICOLON_NEWLINE)
+                ret = CCode('')
+                ret += new_c_type # TODO and what if it needs to be a constant ?
+                ret += c_var
+                ret += CC_ASSIGN
+                ret += CC_OB
+                ret += new_c_type
+                ret += CC_CB
+                ret += cast_from
+                ret += CC_SEMICOLON_NEWLINE
+                return ret
 
             # fn call
 
@@ -504,7 +514,13 @@ class Src:
                 fn_call_args_ctuple = self.pop_fn_call_args(statement_begin)
                 c_fn_args = ctuple_to_ccallargs(fn_call_args_ctuple)
 
-                return ccodecat(c_fn_name, CC_OB, c_fn_args, CC_CB, CC_SEMICOLON_NEWLINE)
+                ret = CCode('')
+                ret += c_fn_name
+                ret += CC_OB
+                ret += c_fn_args
+                ret += CC_CB
+                ret += CC_SEMICOLON_NEWLINE
+                return ret
             
             # invalid
 
@@ -519,9 +535,7 @@ class Src:
             if body_element_or_end is None:
                 break
 
-            body_element:CCode = body_element_or_end
-
-            data = ccodecat(data, body_element)
+            data += body_element_or_end
 
         return data
 
@@ -562,7 +576,6 @@ class Src:
                 break
         
             data += CCode(ch)
-            print(f'{data.val=}')
                 
         if data.empty():
             self.err(f'a C type needs to be specified for `{name}`')
