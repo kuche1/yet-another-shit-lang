@@ -443,11 +443,8 @@ class Src:
             self.err(f'could not find macro end `{MACRO_BODY_END}`')
         
         macro = self.src[:end]
-        print(f'{macro=}')
 
-        print(f'before {self.src[:20]=}')
         self.src = self.src[end+1:]
-        print(f'after  {self.src[:20]=}')
 
         assert MACRO_BODY_BEGIN not in macro
 
