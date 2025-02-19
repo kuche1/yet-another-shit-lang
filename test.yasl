@@ -3,6 +3,12 @@
 //     return 5;
 // }
 
+// TODO
+// `:` return void and put return value in arg pointer
+// `!` return error
+// ? `@` return value exactly as specified ?
+// actually, those are going to make this whole thing much more complex
+
 fn main:int [argc:int argv:char**]
 {
     // printf("hello\n");
@@ -16,7 +22,7 @@ fn main:int [argc:int argv:char**]
     // return 0;
 
 
-    printf["hello\n"]
+    printf["asdfg\n"]
 
     // return 0;
     ret 0

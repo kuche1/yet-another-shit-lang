@@ -54,10 +54,9 @@ class Src:
     def no_more_code(self) -> bool:
         return len(self.src) == 0
     
-    def asrt(self, condition:bool, err_msg:str) -> None:
-        if not condition:
-            print(f'ERROR: file `{self.file}`: line {self.line_number}: {err_msg}', file=sys.stderr)
-            sys.exit(1)
+    def err(self, err_msg:str) -> None:
+        print(f'ERROR: file `{self.file}`: line {self.line_number}: {err_msg}', file=sys.stderr)
+        sys.exit(1)
 
     # pop: whitespace
 
@@ -89,7 +88,7 @@ class Src:
 
     # pop: var name
 
-    def pop_var_name(self, justreturnif:None|str=None) -> str:
+    def popif_var_name(self, orr:None|str=None) -> None|str:
         self.pop_whitespace()
 
         data = ''
@@ -98,7 +97,7 @@ class Src:
             ch = self.src[0]
             self.src = self.src[1:]
 
-            if data + ch == justreturnif:
+            if data + ch == orr:
                 data += ch
                 break
 
@@ -108,7 +107,8 @@ class Src:
 
             data += ch
 
-        assert len(data)
+        if len(data) == 0:
+            return None
 
         # this make the resulting C code less readable
         data = data.replace('-', '$MINUS$')
@@ -116,15 +116,26 @@ class Src:
 
         return data
 
+    # TODO this name is missleading, it's not really just "variable name", see where its used
+    def pop_var_name(self, *, orr:None|str=None) -> str:
+        name = self.popif_var_name(orr=orr)
+        if name is None:
+            msg = 'expected valid variable name'
+            if orr is not None:
+                msg += f' or `{orr}`'
+            self.err(msg)
+
+        assert isinstance(name, str) # make mypy happy
+        return name
+
     # pop: var name and type
 
-    def pop_var_name_and_type(self, just_return_if_varname_is:None|str=None) -> str|tuple[str, str]:
-        name = self.pop_var_name(just_return_if_varname_is)
-        if isinstance(just_return_if_varname_is, str):
-            if name == just_return_if_varname_is:
-                return just_return_if_varname_is
+    def pop_var_name_and_type(self, *, orr:None|str=None) -> str|tuple[str, str]:
+        name = self.pop_var_name(orr=orr)
+        if name == orr:
+            return orr
         
-        assert self.pop_var_name(justreturnif=VAR_TYPE_SEP) == VAR_TYPE_SEP
+        assert self.pop_var_name(orr=VAR_TYPE_SEP) == VAR_TYPE_SEP
         
         typ = self.pop_var_name()
 
@@ -148,15 +159,16 @@ class Src:
 
     # pop: tuple
 
-    def pop_tuple(self) -> tuple[str, ...]:
+    def pop_tuple(self, err:str) -> tuple[str, ...]:
         # TODO we're not taking care of string
 
-        tuple_begin = self.pop_var_name(justreturnif=TUPLE_BEGIN)
-        self.asrt(tuple_begin == TUPLE_BEGIN, f'expected `{TUPLE_BEGIN}`')
+        tuple_begin = self.pop_var_name(orr=TUPLE_BEGIN)
+        if tuple_begin != TUPLE_BEGIN:
+            self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
 
         the_tuple = []
         while True:
-            item = self.pop_var_name(justreturnif=TUPLE_END)
+            item = self.pop_var_name(orr=TUPLE_END)
             if item == TUPLE_END:
                 break
             the_tuple.append(item)
@@ -164,22 +176,22 @@ class Src:
 
     # pop: fn name
 
+    def popif_fn_name(self, *, orr:None|str=None) -> None|str:
+        return self.pop_var_name(orr=orr)
+
     def pop_fn_name_and_returntype(self) -> tuple[str, str]:
         name_and_returntype = self.pop_var_name_and_type()
         assert isinstance(name_and_returntype, tuple) # make mypy happy
         return name_and_returntype
 
-    def pop_fn_name(self, orr:None|str=None) -> str:
-        return self.pop_var_name(orr)
-
     # pop: fn arg
 
     def pop_fn_arg_begin(self) -> None:
-        fn_arg_begin = self.pop_var_name(justreturnif=FN_ARG_BEGIN)
+        fn_arg_begin = self.pop_var_name(orr=FN_ARG_BEGIN)
         assert fn_arg_begin == FN_ARG_BEGIN
 
     def pop_fn_def_arg_or_end(self) -> None|tuple[str,str]:
-        name_and_type = self.pop_var_name_and_type(just_return_if_varname_is=FN_ARG_END)
+        name_and_type = self.pop_var_name_and_type(orr=FN_ARG_END)
         if name_and_type == FN_ARG_END:
             return None
 
@@ -200,13 +212,41 @@ class Src:
 
         return tuple(args)
 
-    def pop_fn_call_args(self) -> tuple[str, ...]:
-        return self.pop_tuple()
+    def pop_fn_call_args(self, fn_name:str) -> tuple[str, ...]:
+        return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
+
+    # pop: fn call
+
+    def pop_fncall_or_fnbodyend_or_ret(self) -> str:
+        while True:
+            fn_name = self.popif_fn_name(orr=FN_BODY_END)
+            print(f'{fn_name=}')
+
+            # fn body end
+
+            if fn_name == FN_BODY_END:
+                return fn_name
+            
+            # ret
+
+            if fn_name == 'ret':
+                val_to_return = self.pop_var_name()
+                return f'return {val_to_return};'
+
+            # fn call
+
+            if fn_name is not None:
+                fn_call_args = self.pop_fn_call_args(fn_name)
+                return f'{fn_name}({', '.join(fn_call_args)});\n'
+
+            # idk
+
+            assert False
 
     # pop: fn body
 
     def pop_fn_body_begin(self) -> None:
-        fn_body_begin = self.pop_var_name(justreturnif=FN_BODY_BEGIN)
+        fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
         assert fn_body_begin == FN_BODY_BEGIN
 
     def pop_fn_body(self) -> str:
@@ -216,13 +256,11 @@ class Src:
 
         data = ''
         while True:
-            fn_name = self.pop_fn_name(orr=FN_BODY_END)
-            if fn_name == FN_BODY_END:
+            fn_name_or_whatever = self.pop_fncall_or_fnbodyend_or_ret()
+            if fn_name_or_whatever == FN_BODY_END:
                 break
 
-            fn_call_args = self.pop_fn_call_args()
-
-            data += f'{fn_name}({','.join(fn_call_args)});\n'
+            data += fn_name_or_whatever
 
         return data
 
