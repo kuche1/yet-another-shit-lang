@@ -34,7 +34,7 @@ fn add-int:int [a:int b:int]
 
 fn main:int [argc:int argv_cpp:char**]
 {
-    printf["hi world\n"]
+    printf['hi world\n']
 
     cast argv:void* argv_cpp
     printf['argc is %d AND argv is %p\n' argc argv]
