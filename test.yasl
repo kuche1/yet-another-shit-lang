@@ -44,9 +44,6 @@ fn main:int [argc:int argv_cpp:char**]
     var b:int 6
     printf["b=%d\n" b]
 
-    // inc a 1
-    // compile time gcc error: modifying const variable
-
     inc b 1
     printf["b=%d\n" b]
 

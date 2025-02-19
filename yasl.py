@@ -148,31 +148,13 @@ class Src:
 
             break
 
-    # pop: synctax characters
+    # pop: syntax characters
 
     def pop_var_type_sep(self, name:str) -> None:
         if self.pop_var_name(orr=VAR_TYPE_SEP) != VAR_TYPE_SEP:
             self.err(f'expected a variable type seperator `{VAR_TYPE_SEP}` after `{name}`')
 
-    def pop_var_value_orr(self, orr:None|str) -> str:
-        value_or_fnccall = self.pop_var_name(orr=orr)
-        if value_or_fnccall == orr:
-            return value_or_fnccall
-
-        fncargs = self.popif_tuple()
-        if fncargs is None:
-            # return the value
-            return value_or_fnccall
-        
-        # is a function call
-        c_fn_name = varname_to_cvarname(value_or_fnccall)
-        c_fn_args = argtuple_to_ccallargs(fncargs)
-        return f'{c_fn_name}({c_fn_args})'
-
-    def pop_var_value(self) -> str:
-        return self.pop_var_value_orr(None)
-
-    # pop: var name + misc
+    # pop: var name
 
     def popif_var_name(self, orr:None|str=None) -> None|str:
         self.pop_whitespace()
@@ -233,6 +215,26 @@ class Src:
         nametype_orr = self.pop_var_name_and_type_orr()
         assert not isinstance(nametype_orr, str)
         return nametype_orr
+
+    # pop: var value
+
+    def pop_var_value_orr(self, orr:None|str) -> str:
+        value_or_fnccall = self.pop_var_name(orr=orr)
+        if value_or_fnccall == orr:
+            return value_or_fnccall
+
+        fncargs = self.popif_tuple()
+        if fncargs is None:
+            # return the value
+            return value_or_fnccall
+        
+        # is a function call
+        c_fn_name = varname_to_cvarname(value_or_fnccall)
+        c_fn_args = argtuple_to_ccallargs(fncargs)
+        return f'{c_fn_name}({c_fn_args})'
+
+    def pop_var_value(self) -> str:
+        return self.pop_var_value_orr(None)
 
     # pop: var metatype
 
