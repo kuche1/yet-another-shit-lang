@@ -17,6 +17,10 @@
 
 // TODO? make all fnc args const (we're going to eventually run into a problem in the future if we don't fix thos)
 
+// TODO not implemented
+// macro add [a b]
+//     (a + b)
+
 fn add-int:int [a:int b:int]
 {
     var sum:int a

@@ -27,6 +27,13 @@ TUPLE_END = FN_ARG_END
 
 VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END]
 
+ST_BEG_RET = 'ret'
+ST_BEG_VAL = 'val'
+ST_BEG_VAR = 'var'
+ST_BEG_INC = 'inc'
+ST_BEG_DEC = 'dec'
+STATEMENT_BEGINNINGS = [ST_BEG_RET, ST_BEG_VAL, ST_BEG_VAR, ST_BEG_INC, ST_BEG_DEC]
+
 # enum
 
 class VarMetatype(enum.Enum):
@@ -51,7 +58,7 @@ class Src:
         
         self.line_number = 1
 
-        self.defined_functions:list[str] = ['printf'] # hack
+        self.defined_functions:list[str] = ['printf'] # TODO hack # TODO change to declared_functions
         self.called_functions:list[str] = []
 
     def no_more_code(self) -> bool:
@@ -69,6 +76,9 @@ class Src:
     def register_function_call(self, fn_name:str) -> None:
         if fn_name not in self.called_functions: # or maybe just use a set
             self.called_functions.append(fn_name)
+    
+    def function_in_register(self, fn_name:str) -> bool:
+        return fn_name in self.defined_functions
     
     def end_of_compilation_checks(self) -> None:
         for fn_called in self.called_functions:
@@ -271,6 +281,9 @@ class Src:
 
     # pop: fn body
 
+    def pop_statement_beginning(self, *, orr:None|str=None) -> str:
+        return self.pop_fn_name(orr=orr)
+
     def pop_fn_body_begin(self) -> None:
         fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
         assert fn_body_begin == FN_BODY_BEGIN
@@ -286,40 +299,42 @@ class Src:
             
             # ret
 
-            if statement_begin == 'ret':
+            if statement_begin == ST_BEG_RET:
                 val_to_return = self.pop_var_name()
                 return f'return {val_to_return};'
             
-            # var set
+            # val or var
 
-            if statement_begin in ['val', 'var']:
+            if statement_begin in [ST_BEG_VAL, ST_BEG_VAR]:
                 var_name, var_type = self.pop_var_name_and_type()
                 var_value = self.pop_var_value()
-                const_prefix = 'const ' if statement_begin == 'val' else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
+                const_prefix = 'const ' if statement_begin == ST_BEG_VAL else '' # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
                 return f'{const_prefix}{var_type} {var_name} = {var_value};\n'
 
             # variable increase
 
-            if statement_begin == 'inc':
+            if statement_begin == ST_BEG_INC:
                 var_name = self.pop_var_name()
                 inc_value = self.pop_var_name()
                 return f'{var_name} += {inc_value};\n'
 
             # variable decrease
 
-            if statement_begin == 'dec':
+            if statement_begin == ST_BEG_DEC:
                 var_name = self.pop_var_name()
                 dec_value = self.pop_var_name()
                 return f'{var_name} -= {dec_value};\n'
 
             # fn call
 
-            self.register_function_call(statement_begin)
+            if self.function_in_register(statement_begin):
+                self.register_function_call(statement_begin) # TODO this might becode useless very soon
+                fn_call_args = self.pop_fn_call_args(statement_begin)
+                return f'{statement_begin}({', '.join(fn_call_args)});\n'
+            
+            # invalid
 
-            # TODO we should that name with the existing functions, and in that case we should say that there needs to be either a valid function name or one of the operators checked for above in this fnc
-            fn_call_args = self.pop_fn_call_args(statement_begin)
-
-            return f'{statement_begin}({', '.join(fn_call_args)});\n'
+            self.err(f'a valid statement beginning needs to be provided; those inclide {STATEMENT_BEGINNINGS}; this could also be a function call (could not find function `{statement_begin}`)')
 
     def pop_fn_body(self) -> str:
         self.pop_fn_body_begin()
@@ -333,11 +348,6 @@ class Src:
             data += body_element
 
         return data
-    
-    # pop: statement
-
-    def pop_statement_beginning(self, *, orr:None|str=None) -> str:
-        return self.pop_fn_name(orr=orr)
 
 # main
 
