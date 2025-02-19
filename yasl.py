@@ -41,8 +41,7 @@ FTS_NO_ERR = VAR_TYPE_SEP
 FTS_ERR = '!'
 FUNCTION_TYPE_SEPARATORS = [FTS_NO_ERR, FTS_ERR] # needs to be of length at least 1
 
-VAR_NAME_SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END] + [STRING] + FUNCTION_TYPE_SEPARATORS
-# TODO! rename to SEPARATOR or something similar
+SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END] + [STRING] + FUNCTION_TYPE_SEPARATORS
 
 ST_BEG_RET = 'ret'
 ST_BEG_VAL = 'val'
@@ -299,7 +298,7 @@ class Src:
         #     ch = self.src[0]
         #     self.src = self.src[1:]
 
-        #     if ch in VAR_NAME_SEPARATORS:
+        #     if ch in SEPARATORS:
         #         self.src = ch + self.src
         #         break
         
@@ -342,7 +341,7 @@ class Src:
                 data += ch
                 break
 
-            if ch in VAR_NAME_SEPARATORS:
+            if ch in SEPARATORS:
                 self.src = ch + self.src
                 break
 
@@ -425,7 +424,7 @@ class Src:
                 value += ch
                 continue
 
-            if ch in VAR_NAME_SEPARATORS:
+            if ch in SEPARATORS:
                 self.src = ch + self.src
                 break
 
