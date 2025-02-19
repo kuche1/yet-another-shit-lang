@@ -225,7 +225,7 @@ class Src:
         fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
         assert fn_body_begin == FN_BODY_BEGIN
 
-    def pop_fncall_or_fnbodyend_or_ret_or_valset(self) -> str:
+    def pop_fncall_or_fnbodyend_or_ret_or_valset_or_varset(self) -> str:
         while True:
             fn_name = self.popif_fn_name(orr=FN_BODY_END)
             print(f'{fn_name=}')
@@ -247,6 +247,14 @@ class Src:
                 val_name, val_type = self.pop_var_name_and_type()
                 val_value = self.pop_var_name()
                 return f'const {val_type} {val_name} = {val_value};\n'
+            
+            # var set
+
+            if fn_name == 'var':
+                # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
+                var_name, var_type = self.pop_var_name_and_type()
+                var_value = self.pop_var_name()
+                return f'{var_type} {var_name} = {var_value};\n'
 
             # fn call
 
@@ -265,7 +273,7 @@ class Src:
 
         data = ''
         while True:
-            fn_name_or_whatever = self.pop_fncall_or_fnbodyend_or_ret_or_valset()
+            fn_name_or_whatever = self.pop_fncall_or_fnbodyend_or_ret_or_valset_or_varset()
             if fn_name_or_whatever == FN_BODY_END:
                 break
 
