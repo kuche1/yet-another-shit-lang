@@ -3,7 +3,6 @@
 # TODO add string support so that printf doesnt shit itself occasionally
 # TODO write function body inplace instead of returning a billion times
 
-
 # from typing import NewType
 from typing import Literal
 from typing import Any
@@ -71,7 +70,7 @@ class CCode:
     
     def __repr__(self) -> str:
         assert False, 'CCode is not to be used with __repr__'
-        return 'ERROR'
+        return 'ERROR' # make pylint happy
 
     def empty(self) -> bool:
         return len(self.val) == 0
