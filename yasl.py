@@ -156,7 +156,7 @@ class Src:
 
     # pop: var name
 
-    def popif_var_name(self, orr:None|str=None) -> None|str:
+    def popif_var_name(self, orr:None|str) -> None|str:
         self.pop_whitespace()
 
         data = ''
