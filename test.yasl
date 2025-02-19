@@ -11,17 +11,6 @@
 
 fn main:int [argc:int argv:char**]
 {
-    // printf("hello\n");
-    // printf("argc=%d\n", argc);
-    // printf("argv=%p\n", (void *) argv);
-
-    // asdfg();
-
-    // val a:int = 5
-
-    // return 0;
-
-
     printf["asdfg\n"]
 
     printf["argc=%d\n" argc]
@@ -31,6 +20,15 @@ fn main:int [argc:int argv:char**]
     printf["a=%d\n" a]
 
     var b:int 6
+    printf["b=%d\n" b]
+
+    // inc a 1
+    // compile time gcc error
+
+    inc b 1
+    printf["b=%d\n" b]
+
+    inc b 2
     printf["b=%d\n" b]
 
     ret 0

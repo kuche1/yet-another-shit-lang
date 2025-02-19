@@ -182,7 +182,7 @@ class Src:
 
     # pop: fn name
 
-    def popif_fn_name(self, *, orr:None|str=None) -> None|str:
+    def pop_fn_name(self, *, orr:None|str=None) -> str:
         return self.pop_var_name(orr=orr)
 
     def pop_fn_name_and_returntype(self) -> tuple[str, str]:
@@ -225,9 +225,9 @@ class Src:
         fn_body_begin = self.pop_var_name(orr=FN_BODY_BEGIN)
         assert fn_body_begin == FN_BODY_BEGIN
 
-    def pop_fncall_or_fnbodyend_or_ret_or_valset_or_varset(self) -> str:
+    def pop_fn_body_element(self) -> str:
         while True:
-            fn_name = self.popif_fn_name(orr=FN_BODY_END)
+            fn_name = self.pop_fn_name(orr=FN_BODY_END)
             print(f'{fn_name=}')
 
             # fn body end
@@ -256,15 +256,18 @@ class Src:
                 var_value = self.pop_var_name()
                 return f'{var_type} {var_name} = {var_value};\n'
 
+            # variable increase
+
+            if fn_name == 'inc':
+                var_name = self.pop_var_name()
+                inc_value = self.pop_var_name()
+                return f'{var_name} += {inc_value};\n'
+
             # fn call
 
-            if fn_name is not None:
-                fn_call_args = self.pop_fn_call_args(fn_name)
-                return f'{fn_name}({', '.join(fn_call_args)});\n'
-
-            # not reachable
-
-            assert False
+            # TODO we should that name with the existing functions, and in that case we should say that there needs to be either a valid function name or one of the operators checked for above in this fnc
+            fn_call_args = self.pop_fn_call_args(fn_name)
+            return f'{fn_name}({', '.join(fn_call_args)});\n'
 
     def pop_fn_body(self) -> str:
         self.pop_fn_body_begin()
@@ -273,11 +276,11 @@ class Src:
 
         data = ''
         while True:
-            fn_name_or_whatever = self.pop_fncall_or_fnbodyend_or_ret_or_valset_or_varset()
-            if fn_name_or_whatever == FN_BODY_END:
+            body_element = self.pop_fn_body_element()
+            if body_element == FN_BODY_END:
                 break
 
-            data += fn_name_or_whatever
+            data += body_element
 
         return data
 
