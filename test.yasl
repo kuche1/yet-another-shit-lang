@@ -24,6 +24,9 @@ fn main:int [argc:int argv:char**]
 
     printf["asdfg\n"]
 
+    printf["argc=%d\n" argc]
+    printf["argv=%p\n" (void*)argv]
+
     // return 0;
     ret 0
 }

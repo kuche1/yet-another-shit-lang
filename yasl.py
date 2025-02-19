@@ -161,6 +161,7 @@ class Src:
 
     def pop_tuple(self, err:str) -> tuple[str, ...]:
         # TODO we're not taking care of string
+        # TODO actually, anything with space doesnt work (like `(void * ) a` or `a + b`)
 
         tuple_begin = self.pop_var_name(orr=TUPLE_BEGIN)
         if tuple_begin != TUPLE_BEGIN:
