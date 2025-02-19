@@ -60,7 +60,7 @@ fn main:int [argc:int argv_cpp:char**]
     val fib(0):int 0
     val fib(1):int 1
     val fib(2):int add-int[fib(0) fib(1)]
-    printf['fib(2)=%d\n' fib(2)] // TODO this shows up as fib$OB$2$CB$=1
+    printf['fib(2)=%d\n' fib(2)]
 
     ret 0
 }
