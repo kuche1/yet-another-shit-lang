@@ -23,7 +23,7 @@ fn main:int [argc:int argv:char**]
     printf["b=%d\n" b]
 
     // inc a 1
-    // compile time gcc error
+    // compile time gcc error: modifying const variable
 
     inc b 1
     printf["b=%d\n" b]
@@ -36,3 +36,6 @@ fn main:int [argc:int argv:char**]
 
     ret 0
 }
+
+// fn main:int
+// compile time yasl error: function already defined

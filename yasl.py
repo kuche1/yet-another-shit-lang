@@ -51,12 +51,19 @@ class Src:
         
         self.line_number = 1
 
+        self.defined_functions:list[str] = []
+
     def no_more_code(self) -> bool:
         return len(self.src) == 0
     
     def err(self, err_msg:str) -> None:
         print(f'ERROR: file `{self.file}`: line {self.line_number}: {err_msg}', file=sys.stderr)
         sys.exit(1)
+    
+    def register_function_definition(self, fn_name:str) -> None:
+        if fn_name in self.defined_functions:
+            self.err(f'function `{fn_name}` already defined')
+        self.defined_functions.append(fn_name)
 
     # pop: whitespace
 
@@ -94,6 +101,9 @@ class Src:
         data = ''
 
         while True:
+            if len(self.src) == 0:
+                break
+
             ch = self.src[0]
             self.src = self.src[1:]
 
@@ -320,10 +330,12 @@ def main() -> None:
 
                     # name and return type
 
-                    name, ret_type = src.pop_fn_name_and_returntype()
+                    fn_name, ret_type = src.pop_fn_name_and_returntype()
 
-                    f_out.write(f'__attribute__((warn_unused_result)) {ret_type} {name}')
+                    f_out.write(f'__attribute__((warn_unused_result)) {ret_type} {fn_name}')
                     # `-Wunused-result` doesn't do the trick
+
+                    src.register_function_definition(fn_name)
 
                     # args
 
