@@ -85,8 +85,7 @@ class CCode:
         return self
     
     def __repr__(self) -> str:
-        assert False, 'CCode is not to be used with __repr__'
-        return 'ERROR' # make pylint happy
+        return f'{self.val}'
 
     def empty(self) -> bool:
         return len(self.val) == 0
@@ -174,6 +173,74 @@ def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
     return ret
 
 ###
+### class funtion signature
+###
+
+class FnSignature:
+
+    def __init__(self, name:str, can_ret_err:bool, return_type:str, args:CCode|tuple[tuple[str,str], ...]) -> None:
+        self.name = name
+        self.can_ret_err = can_ret_err
+        self.return_type = return_type
+        self.args = args
+
+    def __repr__(self) -> str:
+        err_type = FTS_ERR if self.can_ret_err else FTS_NO_ERR
+
+        if isinstance(self.args, CCode):
+            args = f'({self.args})'
+        else:
+            args = ''
+            for name, typ in self.args:
+                args += f'{name}:{typ}, '
+            if args.endswith(', '):
+                args = args[:-2]
+            args = f'[{args}]'
+
+        return f'`fn {self.name}{err_type}{self.return_type} {args}`'
+
+    def matches(self, other:'FnSignature') -> tuple[bool, str]:
+        if self.name != other.name:
+            return False, f'name: `{self.name}` != `{other.name}`'
+        
+        if self.can_ret_err != other.can_ret_err:
+            return False, 'difference in ability to return an error'
+
+        if self.return_type != other.return_type:
+            return False, f'return type: {self.return_type} != {other.return_type}'
+
+        # if `args` is CCode just give up and pretend they're the same
+        if isinstance(self.args, CCode) or (isinstance(other.args, CCode)):
+            pass
+        else:
+            if self.args != other.args:
+                return False, f'arguments: {self.args} != {other.args}' # TODO!!! make this pretty and make a fnc for turning args like that into str
+        
+        return True, ''
+
+class FnSignatures:
+
+    def __init__(self) -> None:
+        self.fns:list[FnSignature] = []
+
+    def name_found(self, name:str) -> bool:
+        for sig in self.fns:
+            if name == sig.name:
+                return True
+        return False
+    
+    def signature_matches(self, fn:FnSignature) -> tuple[bool, str, FnSignature]:
+        for sig in self.fns:
+            if fn.name == sig.name:
+                matches, fail_reason = fn.matches(sig)
+                return matches, fail_reason, sig
+        assert False
+
+    def register(self, fn:FnSignature) -> None:
+        assert not self.name_found(fn.name)
+        self.fns.append(fn)
+
+###
 ### class src
 ###
 
@@ -189,9 +256,8 @@ class Src:
         
         self.line_number = 1
 
-        # TODO ideally we would also check the types
-        self.declared_functions:list[str] = []
-        self.defined_functions:list[str] = []
+        self.declared_functions:FnSignatures = FnSignatures()
+        self.defined_functions:FnSignatures = FnSignatures()
 
     def __del__(self) -> None:
         self.file_out.close()
@@ -208,29 +274,38 @@ class Src:
     def write_ccode(self, code:CCode) -> None:
         self.file_out.write(code.val)
     
+    def warn(self, warn_msg:str) -> None:
+        print(f'WARNING: file `{self.file_in}`: line {self.line_number}: {warn_msg}', file=sys.stderr)
+
     def err(self, err_msg:str) -> NoReturn:
         print(f'ERROR: file `{self.file_in}`: line {self.line_number}: {err_msg}', file=sys.stderr)
         sys.exit(1)
     
-    def register_function_declaration(self, fn_name:str) -> None:
-        # TODO check if A DIFFERENT declaration was already registered
-        # if fn_name in self.declared_functions:
-        #     self.err(f'function `{fn_name}` already declared')
-        if (fn_name not in self.declared_functions) and (fn_name not in self.defined_functions):
-            self.declared_functions.append(fn_name)
+    def register_function_declaration(self, fn:FnSignature) -> None:
+        if self.declared_functions.name_found(fn.name):
+            succ, fail_reason, actual_sig = self.declared_functions.signature_matches(fn)
+            if succ:
+                self.warn(f'function declaration of {fn} already registered')
+            else:
+                self.err(f'function already declared as different type: {fail_reason}: old declaration {actual_sig}, new declaration {fn}')
+        else:
+            self.declared_functions.register(fn)
 
-    def register_function_definition(self, fn_name:str) -> None:
-        # TODO!!! check (errtype, rettype, args) with the declaration if there is one
-        if fn_name in self.defined_functions:
-            self.err(f'function `{fn_name}` already defined')
-        self.defined_functions.append(fn_name)
-        if fn_name in self.declared_functions:
-            self.declared_functions.remove(fn_name)
-        # TODO check the ret type and args too
+    def register_function_definition(self, fn:FnSignature) -> None:
+        if self.declared_functions.name_found(fn.name):
+            succ, fail_reason, actual_sig = self.declared_functions.signature_matches(fn)
+            if not succ:
+                self.err(f'function declaration and definition missmatch: {fail_reason}: function declaration is {actual_sig}, function definition is {fn}')
+        else:
+            self.declared_functions.register(fn)
+
+        if self.defined_functions.name_found(fn.name):
+            self.err(f'function {fn} already defined')
+        else:
+            self.defined_functions.register(fn)
     
-    def function_in_register(self, fn_name:str) -> bool:
-        # TODO if we could also check the arg types
-        return (fn_name in self.declared_functions) or (fn_name in self.defined_functions)
+    def function_name_in_register(self, fn:str) -> bool:
+        return self.declared_functions.name_found(fn)
 
     # pop: whitespace
 
@@ -381,7 +456,6 @@ class Src:
         self.pop_var_type_sep(name)
 
         typ = self.pop_type()
-        print(f'dbg: pop_var_name_and_type_orr: {typ=}')
 
         return name, typ
 
@@ -604,7 +678,9 @@ class Src:
 
             # fn call
 
-            if self.function_in_register(statement_begin):
+            if self.function_name_in_register(statement_begin):
+                # TODO!!! then check the full fnc signature
+
                 c_fn_name = varname_to_ccode(statement_begin)
 
                 fn_call_args_ctuple = self.pop_fn_call_args(statement_begin)
@@ -684,14 +760,11 @@ class Src:
         return tuple(args)
 
     def pop_fn_def_args(self) -> tuple[tuple[str,str], ...]:
-        print(f'dbg: pop_fn_def_args: before popping fn arg begin `{self.src[:20]}`')
         self.pop_fn_arg_begin()
-        print(f'dbg: pop_fn_def_args: after  popping fn arg begin`{self.src[:20]}`')
 
         args = []
         while True:
             arg = self.pop_fn_def_arg_or_end()
-            print(f'dbg: pop_fn_def_args: `{arg=}`')
             if arg is None:
                 break
             args.append(arg)
@@ -771,10 +844,7 @@ def main() -> None:
 
                 # name and return type
 
-                print('dbg: 1')
                 fn_name, fn_can_ret_err, fn_ret_type = src.pop_fn_name_and_canreterr_and_rettype()
-                src.register_function_definition(fn_name)
-                print(f'dbg: 2: {fn_name=}')
 
                 if fn_can_ret_err:
                     src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
@@ -784,13 +854,15 @@ def main() -> None:
 
                 # args
 
-                print('dbg: 3')
                 src.write_ccode(CC_OB)
-                print('dbg: 4')
                 args = src.pop_fn_def_args()
-                print('dbg: 5')
                 src.write_ccode(argtuple_to_cdeclargs(args))
                 src.write_ccode(CC_CB)
+
+                # register
+
+                fn_sig = FnSignature(fn_name, fn_can_ret_err, fn_ret_type, args)
+                src.register_function_definition(fn_sig)
 
                 # body
 
@@ -801,16 +873,19 @@ def main() -> None:
 
             elif metatype == MT_FN_DEC:
 
-                fn_name, fn_canreterr, ret_type = src.pop_fn_name_and_canreterr_and_rettype()
-                src.register_function_declaration(fn_name)
+                fn_name, fn_can_ret_err, ret_type = src.pop_fn_name_and_canreterr_and_rettype()
 
                 c_fn_name = varname_to_ccode(fn_name)
 
                 c_ret_type = type_to_ccode(ret_type)
 
                 fn_args = src.pop_fn_dec_args()
+                # TODO!! the fact that this always returns CCode makes the error messages much less understandable
 
-                if fn_canreterr:
+                fn_sig = FnSignature(fn_name, fn_can_ret_err, ret_type, fn_args)
+                src.register_function_declaration(fn_sig)
+
+                if fn_can_ret_err:
                     src.write_ccode(CC_WARNUNUSEDRESULT_SPACE)
                 src.write_ccode(c_ret_type)
                 src.write_ccode(CC_SPACE)

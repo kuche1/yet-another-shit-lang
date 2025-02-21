@@ -24,7 +24,6 @@ fn@ printf:int (const char *restrict format, ...) // I use macros here cuz i can
 fn@ rand:int []
 
 fn@ test123!int []
-// TODO this is awesome and it works, the problem is that we're currently not checking the declarations with the actual definitions
 
 fn add-int:int [a:int b:int]
 {
