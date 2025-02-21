@@ -514,6 +514,7 @@ class Src:
         # `value` could be a value in itself or a function call
 
         # TODO!! we should also be checking if such a function exists
+        # TODO!! we should be checking if the function can return an error, and if it can we should raise a compiletime error that the value was used before it was checked
         fncargs = self.popif_tuple()
         if fncargs is None:
             return value_to_ccode(value)
@@ -680,6 +681,8 @@ class Src:
 
             if self.function_name_in_register(statement_begin):
                 # TODO!!! then check the full fnc signature
+                # TODO!!! put an assert if the fnc can return an error, maybe take advantage of the c syntax `(val1ignored, val2ignored, val3actualvalue)`
+                # TODO!!! also, make this CCode fnc call code into its own function so that we can use it in that other place (the value popper or the tuple popper or whatever)
 
                 c_fn_name = varname_to_ccode(statement_begin)
 
