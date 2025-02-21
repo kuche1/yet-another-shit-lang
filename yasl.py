@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 # TODO add something like `obj@add` and that would be syntax sugar for `obj_add_$int$(obj, a)` where `int` is infered by the type of `a`
+# TODO add some checks for `pop_type` and `pop_ctype` (actually im not sure this one needs any checks)
 
 # TODO split this file
 # TODO fix all the `!` todos and a coupld of the regular ones
