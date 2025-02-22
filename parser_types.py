@@ -172,12 +172,14 @@ class FnDeclArgs(BaseParserThingClass):
         return ret
 
     # 1st ret is err, 2nd ret is reason
-    def add_another(self, var_name:VarName, var_type:Type) -> tuple[bool, str]: # TODO!!!! var_name and var_type need to be in a tuple
-        for name, typ in self.args:
-            if name.matches(var_name):
-                return True, f'argument {var_name.to_str()} already specified'
+    def add_another(self, arg:tuple[VarName,Type]) -> tuple[bool, str]:
+        arg_name, arg_type = arg
 
-        self.args.append((var_name, var_type))
+        for name, typ in self.args:
+            if name.matches(arg_name):
+                return True, f'argument {arg_name.to_str()} already specified'
+
+        self.args.append(arg)
         return False, ''
 
 ######

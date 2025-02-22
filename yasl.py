@@ -560,8 +560,7 @@ class Src:
             if arg is True:
                 break
 
-            name, typ = arg
-            err, reason = args.add_another(name, typ)
+            err, reason = args.add_another(arg)
             if err:
                 self.err(reason)
 
