@@ -207,7 +207,7 @@ class Var(BaseParserThingClass):
     def __init__(self, name_or_value:str, typ:Type):
         self.name_or_value = name_or_value
         self.typ = typ
-    
+
     def to_str(self) -> str:
         return f'{self.name_or_value}{VAR_TYPE_SEP}{self.typ.to_str()}'
 
