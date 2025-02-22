@@ -79,30 +79,34 @@ class Src:
         sys.exit(1)
     
     def register_function_declaration(self, fn:FnSignature) -> None:
-        if self.declared_functions.name_found(fn.name):
-            succ, fail_reason, actual_sig = self.declared_functions.signature_matches(fn)
-            if succ:
+        found, sig = self.declared_functions.get_signature(fn.name)
+        if found:
+            match, fail_reason = fn.matches(sig)
+            if match:
                 self.warn(f'function declaration of {fn} already registered')
             else:
-                self.err(f'function already declared as different type: {fail_reason}: old declaration {actual_sig}, new declaration {fn}')
+                self.err(f'function already declared as different type: {fail_reason}: old declaration {sig}, new declaration {fn}')
         else:
             self.declared_functions.register(fn)
 
     def register_function_definition(self, fn:FnSignature) -> None:
-        if self.declared_functions.name_found(fn.name):
-            succ, fail_reason, actual_sig = self.declared_functions.signature_matches(fn)
-            if not succ:
-                self.err(f'function declaration and definition missmatch: {fail_reason}: function declaration is {actual_sig}, function definition is {fn}')
+        found, sig = self.declared_functions.get_signature(fn.name)
+        if found:
+            match, fail_reason = fn.matches(sig)
+            if not match:
+                self.err(f'function declaration and definition missmatch: {fail_reason}: function declaration is {sig}, function definition is {fn}')
         else:
             self.declared_functions.register(fn)
 
-        if self.defined_functions.name_found(fn.name):
+        found, sig = self.defined_functions.get_signature(fn.name)
+        if found:
             self.err(f'function {fn} already defined')
         else:
             self.defined_functions.register(fn)
     
     def function_name_in_register(self, fn:str) -> bool:
-        return self.declared_functions.name_found(fn)
+        found, _sig = self.declared_functions.get_signature(fn)
+        return found
 
     # pop: whitespace
 

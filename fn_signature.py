@@ -43,24 +43,26 @@ class FnSignature:
         
         return True, ''
 
+DUMMY_FN_SIGNATURE = FnSignature('<DUMMY>', False, 'int', CCode('(void)'))
+
 class FnSignatures:
 
     def __init__(self) -> None:
         self.fns:list[FnSignature] = []
 
-    def name_found(self, name:str) -> bool:
-        for sig in self.fns:
-            if name == sig.name:
-                return True
-        return False
-    
-    def signature_matches(self, fn:FnSignature) -> tuple[bool, str, FnSignature]:
-        for sig in self.fns:
-            if fn.name == sig.name:
-                matches, fail_reason = fn.matches(sig)
-                return matches, fail_reason, sig
-        assert False
+    def get_signature(self, name:str) -> tuple[bool, FnSignature]: # TODO!!!! make different classes for FnName VarName and shit like that and put them in file `parser_types.py`
+        for fn in self.fns:
+            if fn.name == name:
+                return True, fn
+        return False, DUMMY_FN_SIGNATURE
 
     def register(self, fn:FnSignature) -> None:
-        assert not self.name_found(fn.name)
+        found, _sig = self.get_signature(fn.name)
+        assert not found
         self.fns.append(fn)
+
+# only export what is specified here (also applies to `from X import *`)
+__all__ = [
+    'FnSignature',
+    'FnSignatures',
+]
