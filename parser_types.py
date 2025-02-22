@@ -188,16 +188,6 @@ class FnDeclArgs(BaseParserThingClass):
         self.args.append(arg)
         return False, ''
 
-# TODO!!!! delete if it seems that this is useless
-# ######
-# ###### tuple
-# ######
-
-# class Tuple(BaseParserThingClass):
-
-#     def __init__(self) -> None:
-#         self.value:list[Value] = []
-
 ######
 ###### var
 ######
@@ -254,7 +244,7 @@ class Value(BaseParserThingClass):
 ###### value tuple
 ######
 
-class ValueTuple(BaseParserThingClass): # TODO!!!! and use this everywhere instead of using ', '.join() manually every time
+class ValueTuple(BaseParserThingClass):
 
     def __init__(self) -> None:
         self.value:list[Value] = []
