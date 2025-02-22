@@ -6,7 +6,7 @@ from parser_types import *
 
 class FnSignature:
 
-    def __init__(self, name:FnName, can_ret_err:bool, return_type:VarName, args:CCode|tuple[tuple[VarName,VarName], ...]) -> None:
+    def __init__(self, name:FnName, can_ret_err:bool, return_type:Type, args:CCode|tuple[tuple[VarName,Type], ...]) -> None:
         self.name = name
         self.can_ret_err = can_ret_err
         self.return_type = return_type
@@ -48,7 +48,7 @@ class FnSignature:
         
         return True, ''
 
-DUMMY_FN_SIGNATURE = FnSignature(FnName('dummy'), False, VarName('int'), CCode('(void)'))
+DUMMY_FN_SIGNATURE = FnSignature(FnName('dummy'), False, Type('int'), CCode('(void)'))
 
 class FnSignatures:
 

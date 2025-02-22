@@ -77,6 +77,9 @@ class VarName:
     def to_FnName(self) -> 'FnName':
         return FnName(self.name)
     
+    def to_Type(self) -> 'Type':
+        return Type(self.name)
+    
     def to_ccode(self) -> CCode:
         # ? maybe we could omit the `$` to make the code a bit more readable and compliant
         name = self.name
@@ -102,11 +105,33 @@ class FnName:
     
     def __eq__(self, other:object) -> NoReturn:
         assert False, 'trying to call __eq__ on FnName'
-    def matches(self, other:'FnName') -> bool:
+    def matches(self, other:Self) -> bool:
         return self.name == other.name
     
     def to_ccode(self) -> CCode:
         return VarName(self.name).to_ccode()
+
+######
+###### type
+######
+
+class Type:
+
+    def __init__(self, typ:str):
+        self.typ = typ
+
+    def __repr__(self) -> NoReturn:
+        assert False, 'trying to call __repr__ on FnRetType'
+    def to_str(self) -> str:
+        return f'{self.typ}'
+    
+    def __eq__(self, other:object) -> NoReturn:
+        assert False, 'trying to call __eq__ on FnRetType'
+    def matches(self, other:Self) -> bool:
+        return self.typ == other.typ
+    
+    def to_ccode(self) -> CCode:
+        return VarName(self.typ).to_ccode()
 
 ######
 ###### str to CCode converters
@@ -124,7 +149,7 @@ def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
 
     return ret
 
-def argtuple_to_cdeclargs(args:tuple[tuple[VarName, VarName], ...]) -> CCode:
+def argtuple_to_cdeclargs(args:tuple[tuple[VarName, Type], ...]) -> CCode:
     ret = CCode('')
 
     if len(args) == 0:

@@ -170,12 +170,12 @@ class Src:
 
     # pop: type
 
-    def pop_type(self) -> VarName: # TODO!!!! make into its own type (VarType)
+    def pop_type(self) -> Type:
         ret = self.popif_var_name(orr=None)
         if ret is None:
             self.err('a type needs to be specified')
         assert ret is not True
-        return ret
+        return ret.to_Type()
 
     def pop_c_type(self, name:VarName) -> CCode:
         data:CCode = CCode('')
@@ -243,7 +243,7 @@ class Src:
 
     # pop: var name and type
 
-    def pop_var_name_and_type_orr(self, *, orr:None|str=None) -> Literal[True]|tuple[VarName, VarName]:
+    def pop_var_name_and_type_orr(self, *, orr:None|str=None) -> Literal[True]|tuple[VarName, Type]:
         name = self.pop_var_name(orr=orr)
         if name is True:
             return True
@@ -254,7 +254,7 @@ class Src:
 
         return name, typ
 
-    def pop_var_name_and_type(self) -> tuple[VarName, VarName]:
+    def pop_var_name_and_type(self) -> tuple[VarName, Type]:
         nametype_orr = self.pop_var_name_and_type_orr()
         assert nametype_orr is not True
         return nametype_orr
@@ -530,7 +530,7 @@ class Src:
         assert var_name is not True
         return var_name.to_FnName()
 
-    def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[FnName, bool, VarName]: # TODO!!!! make RetType into its own thing
+    def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[FnName, bool, Type]:
         name = self.pop_fn_name()
         canreterr = self.pop_fn_type_sep(name)
         typ = self.pop_type()
@@ -548,18 +548,18 @@ class Src:
     def pop_fn_arg_begin(self) -> None:
         assert self.popif_fn_arg_begin() is True
 
-    def pop_fn_def_arg_or_end(self) -> Literal[True]|tuple[VarName,VarName]:
+    def pop_fn_def_arg_or_end(self) -> Literal[True] | tuple[VarName,Type]:
         name_and_type = self.pop_var_name_and_type_orr(orr=FN_ARG_END)
         if name_and_type is True:
             return True
 
         return name_and_type
 
-    def popif_fn_def_args(self) -> None|tuple[tuple[VarName,VarName], ...]:
+    def popif_fn_def_args(self) -> None | tuple[tuple[VarName,Type], ...]:
         if not self.popif_fn_arg_begin():
             return None
 
-        args:list[tuple[VarName,VarName]] = []
+        args:list[tuple[VarName,Type]] = []
         while True:
             arg = self.pop_fn_def_arg_or_end()
             if arg is True:
@@ -568,17 +568,10 @@ class Src:
 
         return tuple(args)
 
-    def pop_fn_def_args(self) -> tuple[tuple[VarName,VarName], ...]:
-        self.pop_fn_arg_begin()
-
-        args:list[tuple[VarName,VarName]] = []
-        while True:
-            arg = self.pop_fn_def_arg_or_end()
-            if arg is True:
-                break
-            args.append(arg)
-
-        return tuple(args)
+    def pop_fn_def_args(self) -> tuple[tuple[VarName,Type], ...]:
+        ret = self.popif_fn_def_args()
+        assert ret is not None
+        return ret
 
     def pop_fn_dec_args(self) -> CCode:
         args = self.popif_fn_def_args()
