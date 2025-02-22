@@ -1,9 +1,11 @@
 
+from typing import NoReturn
+
 from parser_types import *
 
 class FnSignature:
 
-    def __init__(self, name:str, can_ret_err:bool, return_type:str, args:CCode|tuple[tuple[str,str], ...]) -> None:
+    def __init__(self, name:FnName, can_ret_err:bool, return_type:str, args:CCode|tuple[tuple[str,str], ...]) -> None:
         self.name = name
         self.can_ret_err = can_ret_err
         self.return_type = return_type
@@ -13,7 +15,7 @@ class FnSignature:
         err_type = FTS_ERR if self.can_ret_err else FTS_NO_ERR
 
         if isinstance(self.args, CCode):
-            args = f'({self.args})'
+            args = f'({self.args.to_str()})'
         else:
             args = ''
             for name, typ in self.args:
@@ -22,12 +24,14 @@ class FnSignature:
                 args = args[:-2]
             args = f'[{args}]'
 
-        return f'`fn {self.name}{err_type}{self.return_type} {args}`'
+        return f'`fn {self.name.to_str()}{err_type}{self.return_type} {args}`'
 
+    def __eq__(self, other:object) -> NoReturn:
+        assert False, f'trying to call __eq__ on FnSignature'
     def matches(self, other:'FnSignature') -> tuple[bool, str]:
-        if self.name != other.name:
-            return False, f'name: `{self.name}` != `{other.name}`'
-        
+        if not self.name.matches(other.name):
+            return False, f'name missmatch `{self.name.to_str()}` and `{other.name.to_str()}`'
+
         if self.can_ret_err != other.can_ret_err:
             return False, 'difference in ability to return an error'
 
@@ -43,16 +47,16 @@ class FnSignature:
         
         return True, ''
 
-DUMMY_FN_SIGNATURE = FnSignature('<DUMMY>', False, 'int', CCode('(void)'))
+DUMMY_FN_SIGNATURE = FnSignature(FnName('dummy'), False, 'int', CCode('(void)'))
 
 class FnSignatures:
 
     def __init__(self) -> None:
         self.fns:list[FnSignature] = []
 
-    def get_signature(self, name:str) -> tuple[bool, FnSignature]: # TODO!!!! make different classes for FnName VarName and shit like that and put them in file `parser_types.py`
+    def get_signature(self, name:FnName) -> tuple[bool, FnSignature]:
         for fn in self.fns:
-            if fn.name == name:
+            if name.matches(fn.name):
                 return True, fn
         return False, DUMMY_FN_SIGNATURE
 

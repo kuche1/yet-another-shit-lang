@@ -1,5 +1,9 @@
 
+from typing import NoReturn
+
 from constants import *
+
+# TODO add: VarName VarFnType FnCanRetErr ArgsType and stuff like that
 
 ######
 ###### ccode
@@ -22,9 +26,8 @@ class CCode:
     
     def __repr__(self) -> str: # TODO as of 2025.02.22 we're still relying on this in the code, the affected code needs to use `as_str` instead
         assert False, 'calling __repr__ on CCode'
-        return f'{self.val}'
 
-    def as_str(self) -> str:
+    def to_str(self) -> str:
         return f'{self.val}'
 
     def empty(self) -> bool:
@@ -50,6 +53,7 @@ CC_CBC = CCode('}')
 CC_NEWLINE = CCode('\n')
 
 # str to CCode converters
+# TODO!!! all of these functions need to go, instead the appropriate `.to_` method needs to be implemented on the given class (when we decide to do that: we needto use __all__ and exclude all these function)
 
 def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
     ret = CCode('')
@@ -105,3 +109,24 @@ def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
     ret.del_if_startswith(CC_COMMA_SPACE)
     return ret
 
+######
+###### fn name
+######
+
+class FnName:
+
+    def __init__(self, name:str):
+        self.name = name
+
+    def __repr__(self) -> NoReturn:
+        assert False, 'trying to call __repr__ on FnName'
+    def to_str(self) -> str:
+        return f'{self.name}'
+    
+    def __eq__(self, other:object) -> NoReturn:
+        assert False, 'trying to call __eq__ on FnName'
+    def matches(self, other:'FnName') -> bool:
+        return self.name == other.name
+    
+    def to_ccode(self) -> CCode:
+        return varname_to_ccode(self.name)

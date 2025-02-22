@@ -104,7 +104,7 @@ class Src:
         else:
             self.defined_functions.register(fn)
     
-    def function_name_in_register(self, fn:str) -> bool:
+    def function_name_in_register(self, fn:FnName) -> bool:
         found, _sig = self.declared_functions.get_signature(fn)
         return found
 
@@ -144,7 +144,7 @@ class Src:
             self.unpop_var_name(sep)
             self.err(f'variable `{var_name}`: expected a type seperator `{VAR_TYPE_SEP}`, instead got `{sep}`')
     
-    def pop_fn_type_sep(self, name:str) -> bool:
+    def pop_fn_type_sep(self, name:FnName) -> bool:
         for fts in FUNCTION_TYPE_SEPARATORS:
             sep = self.popif_var_name(orr=fts)
             if sep == fts:
@@ -161,7 +161,7 @@ class Src:
         else:
             info = sep
 
-        self.err(f'function `{name}`: expected one of the function type seperators {FUNCTION_TYPE_SEPARATORS}, instead got `{info}`')
+        self.err(f'function {name.to_str()}: expected one of the function type seperators {FUNCTION_TYPE_SEPARATORS}, instead got `{info}`')
 
     # pop: type
 
@@ -480,12 +480,14 @@ class Src:
 
             # fn call
 
-            if self.function_name_in_register(statement_begin):
+            fn_name = FnName(statement_begin)
+
+            if self.function_name_in_register(fn_name):
                 # TODO!!! then check the full fnc signature
                 # TODO!!! put an assert if the fnc can return an error, maybe take advantage of the c syntax `(val1ignored, val2ignored, val3actualvalue)`
                 # TODO!!! also, make this CCode fnc call code into its own function so that we can use it in that other place (the value popper or the tuple popper or whatever)
 
-                c_fn_name = varname_to_ccode(statement_begin)
+                c_fn_name = fn_name.to_ccode()
 
                 fn_call_args_ctuple = self.pop_fn_call_args(statement_begin)
                 c_fn_args = ctuple_to_ccallargs(fn_call_args_ctuple)
@@ -518,10 +520,14 @@ class Src:
 
         return False, data
 
-    # pop: fn name can_return_error return_type
+    # pop: fn_name can_return_error return_type
 
-    def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[str, bool, str]:
-        name = self.pop_var_name()
+    def pop_fn_name(self) -> FnName:
+        var_name = self.pop_var_name()
+        return FnName(var_name)
+
+    def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[FnName, bool, str]:
+        name = self.pop_fn_name()
         canreterr = self.pop_fn_type_sep(name)
         typ = self.pop_type()
         return name, canreterr ,typ
@@ -591,10 +597,10 @@ class Src:
 
     # pop: fn body
 
-    def pop_fn_body(self, fn_name:str) -> CCode:
+    def pop_fn_body(self, fn_name:FnName) -> CCode:
         err, data = self.pop_code_block()
         if err:
-            self.err(f'function `{fn_name}`: could not find function body `{CODE_BLOCK_BEGIN}`, instead got `{data}`')
+            self.err(f'function {fn_name.to_str()}: could not find function body `{CODE_BLOCK_BEGIN}`, instead got `{data}`')
         assert isinstance(data, CCode) # make mypy happy
         return data
 
@@ -654,7 +660,7 @@ def main() -> None:
                     src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
                 src.write_ccode(type_to_ccode(fn_ret_type))
                 src.write_ccode(CC_SPACE)
-                src.write_ccode(varname_to_ccode(fn_name))
+                src.write_ccode(fn_name.to_ccode())
 
                 # args
 
@@ -679,7 +685,7 @@ def main() -> None:
 
                 fn_name, fn_can_ret_err, ret_type = src.pop_fn_name_and_canreterr_and_rettype()
 
-                c_fn_name = varname_to_ccode(fn_name)
+                c_fn_name = fn_name.to_ccode()
 
                 c_ret_type = type_to_ccode(ret_type)
 
