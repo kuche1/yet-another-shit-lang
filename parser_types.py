@@ -54,21 +54,29 @@ CC_CBC = CCode('}')
 CC_NEWLINE = CCode('\n')
 
 ######
+###### base class
+######
+
+class BaseParserThingClass:
+
+    def __repr__(self) -> NoReturn:
+        assert False, f'trying to call __repr__ on {type(self)}'
+    
+    def __eq__(self, other:object) -> NoReturn:
+        assert False, f'trying to call __eq__ on {type(self)}'
+
+######
 ###### var name
 ######
 
-class VarName:
+class VarName(BaseParserThingClass):
 
     def __init__(self, name:str):
         self.name = name
 
-    def __repr__(self) -> NoReturn:
-        assert False, 'trying to call __repr__ on VarName'
     def to_str(self) -> str:
         return f'{self.name}'
-    
-    def __eq__(self, other:object) -> NoReturn:
-        assert False, 'trying to call __eq__ on VarName'
+
     def matches(self, other:Self) -> bool:
         return self.name == other.name
     def matches_str(self, other:str) -> bool:
@@ -93,18 +101,14 @@ class VarName:
 ###### fn name
 ######
 
-class FnName:
+class FnName(BaseParserThingClass):
 
     def __init__(self, name:str):
         self.name = name
 
-    def __repr__(self) -> NoReturn:
-        assert False, 'trying to call __repr__ on FnName'
     def to_str(self) -> str:
         return f'{self.name}'
-    
-    def __eq__(self, other:object) -> NoReturn:
-        assert False, 'trying to call __eq__ on FnName'
+
     def matches(self, other:Self) -> bool:
         return self.name == other.name
     
@@ -115,18 +119,14 @@ class FnName:
 ###### type
 ######
 
-class Type:
+class Type(BaseParserThingClass):
 
     def __init__(self, typ:str):
         self.typ = typ
 
-    def __repr__(self) -> NoReturn:
-        assert False, 'trying to call __repr__ on FnRetType'
     def to_str(self) -> str:
         return f'{self.typ}'
-    
-    def __eq__(self, other:object) -> NoReturn:
-        assert False, 'trying to call __eq__ on FnRetType'
+
     def matches(self, other:Self) -> bool:
         return self.typ == other.typ
     
