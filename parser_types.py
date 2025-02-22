@@ -173,9 +173,6 @@ def value_to_ccode(value:str) -> CCode:
         return CCode('"' + value[1:-1] + '"')
     return VarName(value).to_ccode()
 
-def type_to_ccode(typ:str) -> CCode:
-    return CCode(typ)
-
 def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
     ret = CCode('')
     for arg in args:
