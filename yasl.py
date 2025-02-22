@@ -320,16 +320,7 @@ class Src:
             var = Var(var_name_or_value, var_type)
             return Value(var)
 
-        # TODO!!!! delete BUT PRESERVE COMMENTS IF THEY MAKE SENSE
-        # # is a function call # TODO!!!! actually, maybe it would be better if we created a variable and stored the function return value in that variable rather than calling the function right away
-        # c_fn_name = FnName(value).to_ccode() # TODO if we are to implement anonymous functions this needs to change
-        # c_fn_args = ctuple_to_ccallargs(fncargs)
-        # ret = CCode('')
-        # ret += c_fn_name
-        # ret += CC_OB
-        # ret += c_fn_args
-        # ret += CC_CB
-        # return ret
+        # TODO!!! perhaps it would be better to just create a new vairable and set it to the value returned by the function
 
         fn_name = FnName(value)
         fn_args = fncargs

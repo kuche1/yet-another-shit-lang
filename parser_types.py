@@ -235,13 +235,11 @@ class FnCall(BaseParserThingClass):
         return f'{self.name.to_str()}{TUPLE_BEGIN}{call}{TUPLE_END}'
 
     def to_ccode(self) -> CCode:
-        print(f'dbg: translating function call: function name {self.name.to_str()}')
         ret = self.name.to_ccode()
 
         ret += CC_OB
 
         for arg in self.args:
-            print(f'dbg: translating function call: argument {arg.to_str()}')
             ret += arg.to_ccode()
             ret += CC_COMMA_SPACE
 
