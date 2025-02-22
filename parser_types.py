@@ -223,30 +223,16 @@ class Var(BaseParserThingClass):
 
 class FnCall(BaseParserThingClass):
 
-    def __init__(self, name:FnName, args:tuple['Value', ...]):
+    def __init__(self, name:FnName, args:'ValueTuple'):
         self.name = name
         self.args = args
 
     def to_str(self) -> str:
-        call = ', '.join([arg.to_str() for arg in self.args])
-        if call.endswith(', '):
-            call = call[:-2]
-
-        return f'{self.name.to_str()}{TUPLE_BEGIN}{call}{TUPLE_END}'
+        return f'{self.name.to_str()}{self.args.to_str()}'
 
     def to_ccode(self) -> CCode:
         ret = self.name.to_ccode()
-
-        ret += CC_OB
-
-        for arg in self.args:
-            ret += arg.to_ccode()
-            ret += CC_COMMA_SPACE
-
-        ret.del_if_endswith(CC_COMMA_SPACE)
-
-        ret += CC_CB
-
+        ret += self.args.to_ccode()
         return ret
 
 ######
@@ -265,22 +251,44 @@ class Value(BaseParserThingClass):
         return self.value.to_ccode()
 
 ######
-###### str to CCode converters
+###### value tuple
 ######
-# TODO!!!! all of these functions need to go, instead the appropriate `.to_` method needs to be implemented on the given class (when we decide to do that: we needto use __all__ and exclude all these function)
 
-def value_to_ccode(value:str) -> CCode:
-    if is_str(value):
-        return CCode('"' + value[1:-1] + '"')
-    return VarName(value).to_ccode()
+class ValueTuple(BaseParserThingClass): # TODO!!!! and use this everywhere instead of using ', '.join() manually every time
 
-def valuetuple_to_ccallargs(args:tuple[Value, ...]) -> CCode:
-    ret = CCode('')
-    for arg in args:
-        ret += CC_COMMA_SPACE
-        ret += arg.to_ccode()
-    ret.del_if_startswith(CC_COMMA_SPACE)
-    return ret
+    def __init__(self) -> None:
+        self.value:list[Value] = []
+    
+    def to_str(self) -> str:
+        ret = TUPLE_BEGIN
+
+        for item in self.value:
+            ret += f'{item.to_str()}, '
+        
+        if ret.endswith(', '):
+            ret = ret[:-2]
+
+        ret += TUPLE_END
+
+        return ret
+    
+    def to_ccode(self) -> CCode:
+        ret = CCode('')
+
+        ret += CC_OB
+
+        for item in self.value:
+            ret += item.to_ccode()
+            ret += CC_COMMA_SPACE
+
+        ret.del_if_endswith(CC_COMMA_SPACE)
+
+        ret += CC_CB
+
+        return ret
+
+    def add_another(self, item:Value) -> None:
+        self.value.append(item)
 
 ######
 ###### string check

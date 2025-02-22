@@ -334,7 +334,7 @@ class Src:
 
     # pop: tuple
 
-    def popif_tuple(self) -> None|tuple[Value, ...]:
+    def popif_tuple(self) -> None|ValueTuple:
         # TODO we're not taking care of string
         # TODO actually, anything with space doesnt work (like `(void * ) a` or `a + b`)
 
@@ -348,15 +348,16 @@ class Src:
     
         self.src = self.src[1:]
 
-        the_tuple:list[Value] = []
+        the_tuple = ValueTuple()
         while True:
             item = self.pop_value_orr(orr=TUPLE_END)
             if item is True:
                 break
-            the_tuple.append(item)
-        return tuple(the_tuple)
+            the_tuple.add_another(item)
 
-    def pop_tuple(self, err:str) -> tuple[Value, ...]:
+        return the_tuple
+
+    def pop_tuple(self, err:str) -> ValueTuple:
         data = self.popif_tuple()
         if data is None:
             self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
@@ -490,13 +491,11 @@ class Src:
                 c_fn_name = fn_name.to_ccode()
 
                 fn_call_args_ctuple = self.pop_fn_call_args(fn_name)
-                c_fn_args = valuetuple_to_ccallargs(fn_call_args_ctuple)
+                c_fn_args = fn_call_args_ctuple.to_ccode()
 
                 ret = CCode('')
                 ret += c_fn_name
-                ret += CC_OB
                 ret += c_fn_args
-                ret += CC_CB
                 ret += CC_SEMICOLON_NEWLINE
                 return ret
             
@@ -587,7 +586,7 @@ class Src:
         
         self.err('could not get function declaration args, tried both definition args and macro args')
 
-    def pop_fn_call_args(self, fn_name:FnName) -> tuple[Value, ...]:
+    def pop_fn_call_args(self, fn_name:FnName) -> ValueTuple:
         return self.pop_tuple(f'could not get function `{fn_name.to_str()}`\'s call args')
 
     # pop: fn body
