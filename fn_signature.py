@@ -1,5 +1,5 @@
 
-from ccode import *
+from parser_types import *
 
 class FnSignature:
 

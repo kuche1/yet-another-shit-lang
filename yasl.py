@@ -20,8 +20,8 @@ import sys
 import os
 
 from fn_signature import *
+from parser_types import *
 from constants import *
-from ccode import *
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 FOLDER_TMP = os.path.join(HERE, 'tmp')

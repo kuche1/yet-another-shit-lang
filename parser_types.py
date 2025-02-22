@@ -1,6 +1,10 @@
 
 from constants import *
 
+######
+###### ccode
+######
+
 # CCode = typing.NewType("CCode", str)
 # # even using this, mypy still allows passing `CCode` to functions requiring a `str` argument
 
@@ -100,3 +104,4 @@ def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
         ret += arg
     ret.del_if_startswith(CC_COMMA_SPACE)
     return ret
+
