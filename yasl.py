@@ -21,6 +21,9 @@ import shutil
 import sys
 import os
 
+from constants import *
+from ccode import *
+
 HERE = os.path.dirname(os.path.realpath(__file__))
 FOLDER_TMP = os.path.join(HERE, 'tmp')
 FILE_INPUT = os.path.join(HERE, 'test.yasl')
@@ -28,152 +31,12 @@ FILE_TMP_OUTPUT_UGLY = os.path.join(FOLDER_TMP, 'code_ugly.c')
 FILE_TMP_OUTPUT = os.path.join(FOLDER_TMP, 'code.c')
 FILE_EXECUTABLE = os.path.join(FOLDER_TMP, 'executable')
 
-NEWLINE = '\n'
-WHITESPACE = [' ', '\t', NEWLINE]
-
-FN_ARG_BEGIN = '['
-FN_ARG_END = ']'
-
-CODE_BLOCK_BEGIN = '{'
-CODE_BLOCK_END = '}'
-
-VAR_TYPE_SEP = ':'
-
-TUPLE_BEGIN = FN_ARG_BEGIN
-TUPLE_END = FN_ARG_END
-
-STRING = "'"
-
-FTS_NO_ERR = VAR_TYPE_SEP
-FTS_ERR = '!'
-FUNCTION_TYPE_SEPARATORS = [FTS_NO_ERR, FTS_ERR] # needs to be at least of length 1
-
-SEPARATORS = WHITESPACE + [FN_ARG_BEGIN, FN_ARG_END] + [VAR_TYPE_SEP] + [TUPLE_BEGIN, TUPLE_END] + [STRING] + FUNCTION_TYPE_SEPARATORS
-
-ST_BEG_RET = 'ret'
-ST_BEG_VAL = 'val'
-ST_BEG_VAR = 'var'
-ST_BEG_INC = 'inc'
-ST_BEG_DEC = 'dec'
-ST_BEG_CAST = 'cast'
-ST_BEG_IF = 'if'
-STATEMENT_BEGINNINGS = [ST_BEG_RET, ST_BEG_VAL, ST_BEG_VAR, ST_BEG_INC, ST_BEG_DEC, ST_BEG_CAST, ST_BEG_IF]
-
-MT_FN_DEF = 'fn'
-MT_FN_DEC = 'fn@'
-METATYPES = [MT_FN_DEF, MT_FN_DEC]
-
-MACRO_BODY_BEGIN = '('
-MACRO_BODY_END = ')'
-# right now those CAN be part of a variable name
-# I'm intentionally keeping this here, just to see what happens
-
-###
-### c code
-###
-
-# CCode = typing.NewType("CCode", str)
-# # even using this, mypy still allows passing `CCode` to functions requiring a `str` argument
-
-# I really didn't want to do this but
-# I couldn't find a way to get the compiler
-# to act more strictly
-class CCode:
-
-    def __init__(self, val:str):
-        self.val = val
-
-    def __iadd__(self, other:'CCode') -> 'CCode':
-        self.val += other.val
-        return self
-    
-    def __repr__(self) -> str:
-        return f'{self.val}'
-
-    def empty(self) -> bool:
-        return len(self.val) == 0
-
-    def del_if_endswith(self, end:'CCode') -> None:
-        if self.val.endswith(end.val):
-            self.val = self.val[:-len(end.val)]
-
-    def del_if_startswith(self, start:'CCode') -> None:
-        if self.val.startswith(start.val):
-            self.val = self.val[len(start.val):]
-
-CC_SPACE = CCode(' ')
-CC_SEMICOLON_NEWLINE = CCode(';\n')
-CC_ASSIGN = CCode(' = ')
-CC_OB = CCode('(')
-CC_CB = CCode(')')
-CC_COMMA_SPACE = CCode(', ')
-CC_WARNUNUSEDRESULT_SPACE = CCode('__attribute__((warn_unused_result)) ')
-CC_CBO = CCode('{')
-CC_CBC = CCode('}')
-CC_NEWLINE = CCode('\n')
-
 ###
 ### fncs
 ###
 
 def term(args:list[str]) -> None:
     subprocess.run(args, check=True)
-
-# str to CCode converters
-
-def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
-    ret = CCode('')
-
-    for val in args:
-        ret += value_to_ccode(val)
-        ret += CC_COMMA_SPACE
-
-    ret.del_if_endswith(CC_COMMA_SPACE)
-
-    return ret
-
-def argtuple_to_cdeclargs(args:tuple[tuple[str, str], ...]) -> CCode:
-    ret = CCode('')
-
-    if len(args) == 0:
-        ret += CCode('void')
-    else:
-        for arg_name, arg_type in args:
-            ret += type_to_ccode(arg_type)
-            ret += CC_SPACE
-            ret += varname_to_ccode(arg_name)
-            ret += CC_COMMA_SPACE
-        ret.del_if_endswith(CC_COMMA_SPACE)
-
-    return ret
-
-def varname_to_ccode(name:str) -> CCode:
-    # maybe we could omit the `$` to make the code a bit more readable and compliant
-    name = name.replace('-', '$M$')
-    name = name.replace('+', '$P$')
-    name = name.replace('(', '$OB$')
-    name = name.replace(')', '$CB$')
-    return CCode(name)
-
-def value_to_ccode(value:str) -> CCode:
-    if value.startswith(STRING):
-        assert value.endswith(STRING)
-        assert len(value) >= 2
-        assert value[1:-1].count(STRING) == 0
-        assert value[1:-1].count('"') == 0
-        return CCode('"' + value[1:-1] + '"')
-    return varname_to_ccode(value)
-
-def type_to_ccode(typ:str) -> CCode:
-    return CCode(typ)
-
-def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
-    ret = CCode('')
-    for arg in args:
-        ret += CC_COMMA_SPACE
-        ret += arg
-    ret.del_if_startswith(CC_COMMA_SPACE)
-    return ret
 
 ###
 ### class funtion signature
