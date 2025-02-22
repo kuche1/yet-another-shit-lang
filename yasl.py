@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+# TODO!!!! split `pop_var_name` into 2 functions - `pop_var_name` and `pop_var_name_orr`
+
 # TODO add something like `obj@add` and that would be syntax sugar for `obj_add_$int$(obj, a)` where `int` is infered by the type of `a`
 # TODO add some checks for `pop_type` and `pop_ctype` (actually im not sure this one needs any checks)
 # TODO add the ability to make vars mutable, and if they are mutable pass them as reference (we would also need to track all variables so that when that variable is used we would know to automatically dereference it)
@@ -138,58 +140,44 @@ class Src:
 
     # pop: type separator
 
-    def pop_var_type_sep(self, var_name:str) -> None:
+    def pop_var_type_sep(self, var_name:VarName) -> None:
         sep = self.pop_var_name(orr=VAR_TYPE_SEP)
-        if sep != VAR_TYPE_SEP:
-            self.unpop_var_name(sep)
-            self.err(f'variable `{var_name}`: expected a type seperator `{VAR_TYPE_SEP}`, instead got `{sep}`')
+        self.unpop_var_name(sep)
+        if sep is not True:
+            self.err(f'variable `{var_name.to_str()}`: expected a type seperator `{VAR_TYPE_SEP}`, instead got `{sep}`')
     
     def pop_fn_type_sep(self, name:FnName) -> bool:
+
         for fts in FUNCTION_TYPE_SEPARATORS:
+
             sep = self.popif_var_name(orr=fts)
-            if sep == fts:
-                if sep == FTS_NO_ERR:
+            self.unpop_var_name(sep)
+
+            if sep is True:
+                if fts == FTS_NO_ERR:
                     return False
-                if sep == FTS_ERR:
+                if fts == FTS_ERR:
                     return True
                 assert False
-            if sep is not None:
-                self.unpop_var_name(sep)
 
         if sep is None:
             info = '<end of file>'
         else:
-            info = sep
+            assert sep is not True # make mypy happy
+            info = sep.to_str()
 
         self.err(f'function {name.to_str()}: expected one of the function type seperators {FUNCTION_TYPE_SEPARATORS}, instead got `{info}`')
 
     # pop: type
 
-    def pop_type(self) -> str:
-        # TODO this turned out to be exactly the same as `pop_var_name` except with a few bugs
+    def pop_type(self) -> VarName: # TODO!!!! make into its own type (VarType)
         ret = self.popif_var_name(orr=None)
         if ret is None:
             self.err('a type needs to be specified')
+        assert ret is not True
         return ret
 
-        # data = ''
-
-        # while not self.no_more_code():
-        #     ch = self.src[0]
-        #     self.src = self.src[1:]
-
-        #     if ch in SEPARATORS:
-        #         self.src = ch + self.src
-        #         break
-        
-        #     data += ch
-                
-        # if len(data) == 0:
-        #     self.err('a type needs to be specified')
-
-        # return data
-
-    def pop_c_type(self, name:str) -> CCode:
+    def pop_c_type(self, name:VarName) -> CCode:
         data:CCode = CCode('')
 
         while not self.no_more_code():
@@ -202,13 +190,13 @@ class Src:
             data += CCode(ch)
                 
         if data.empty():
-            self.err(f'a C type needs to be specified for `{name}`')
+            self.err(f'a C type needs to be specified for `{name.to_str()}`')
 
         return data
 
     # pop: var name
 
-    def popif_var_name(self, orr:None|str) -> None|str:
+    def popif_var_name(self, orr:None|str) -> None|Literal[True]|VarName:
         self.pop_whitespace()
 
         data = ''
@@ -218,8 +206,7 @@ class Src:
             self.src = self.src[1:]
 
             if data + ch == orr:
-                data += ch
-                break
+                return True
 
             if ch in SEPARATORS:
                 self.src = ch + self.src
@@ -230,29 +217,36 @@ class Src:
         if len(data) == 0:
             return None
 
-        return data
+        return VarName(data)
 
     # TODO this name is missleading, it's not really just "variable name", see where its used
     # TODO! this has been fucking me over for some time now...
-    def pop_var_name(self, *, orr:None|str=None) -> str:
+    def pop_var_name(self, *, orr:None|str=None) -> Literal[True]|VarName:
         name = self.popif_var_name(orr=orr)
+        
         if name is None:
             msg = 'expected valid variable name'
             if orr is not None:
                 msg += f' or `{orr}`'
             self.err(msg)
+        
+        if name is True:
+            return True
 
         return name
     
-    def unpop_var_name(self, name:str) -> None:
-        self.src = name + ' ' + self.src
+    # the input of this needs to be the same as the output of `pop_var_name`
+    def unpop_var_name(self, name:None|Literal[True]|VarName) -> None:
+        if not isinstance(name, VarName):
+            return
+        self.src = name.to_str() + ' ' + self.src
 
     # pop: var name and type
 
-    def pop_var_name_and_type_orr(self, *, orr:None|str=None) -> str|tuple[str, str]:
+    def pop_var_name_and_type_orr(self, *, orr:None|str=None) -> Literal[True]|tuple[VarName, VarName]:
         name = self.pop_var_name(orr=orr)
-        if name == orr:
-            return orr
+        if name is True:
+            return True
 
         self.pop_var_type_sep(name)
 
@@ -260,15 +254,17 @@ class Src:
 
         return name, typ
 
-    def pop_var_name_and_type(self) -> tuple[str, str]:
+    def pop_var_name_and_type(self) -> tuple[VarName, VarName]:
         nametype_orr = self.pop_var_name_and_type_orr()
-        assert not isinstance(nametype_orr, str)
+        assert nametype_orr is not True
         return nametype_orr
 
     # pop: var metatype
 
-    def pop_var_metatype(self) -> str:
-        return self.pop_var_name()
+    def pop_var_metatype(self) -> VarName:
+        ret = self.pop_var_name()
+        assert ret is not True
+        return ret
 
     # pop: value
 
@@ -321,7 +317,7 @@ class Src:
             return value_to_ccode(value)
 
         # is a function call
-        c_fn_name = varname_to_ccode(value) # TODO if we are to implement anonymous functions this needs to change
+        c_fn_name = FnName(value).to_ccode() # TODO if we are to implement anonymous functions this needs to change
         c_fn_args = ctuple_to_ccallargs(fncargs)
         ret = CCode('')
         ret += c_fn_name
@@ -367,17 +363,21 @@ class Src:
 
     # pop: code block
 
-    def pop_statement_beginning(self, *, orr:None|str=None) -> str:
+    def pop_statement_beginning(self, *, orr:None|str=None) -> Literal[True]|VarName:
         return self.pop_var_name(orr=orr)
 
-    def pop_code_block_begin(self) -> tuple[Literal[True],str] | tuple[Literal[False],None]:
+    # 1st return value is err, 2nd is what we got instead
+    def pop_code_block_begin(self) -> tuple[Literal[True],str] | tuple[Literal[False],None]: # TODO!!!! this needs to be streamlined to tuple[bool,str]
         fn_body_begin = self.popif_var_name(orr=CODE_BLOCK_BEGIN)
-        if fn_body_begin != CODE_BLOCK_BEGIN:
-            if fn_body_begin is None:
-                return True, '<end of input reached>'
-            self.unpop_var_name(fn_body_begin)
-            return True, fn_body_begin
-        return False, None
+        self.unpop_var_name(fn_body_begin)
+
+        if fn_body_begin is True:
+            return False, None
+        
+        if fn_body_begin is None:
+            return True, '<end of input reached>'
+
+        return True, fn_body_begin.to_str()
 
     def pop_code_block_element(self) -> None|CCode:
         while True:
@@ -385,12 +385,12 @@ class Src:
 
             # fn body end
 
-            if statement_begin == CODE_BLOCK_END:
+            if statement_begin is True:
                 return None
             
             # ret
 
-            if statement_begin == ST_BEG_RET:
+            if statement_begin.matches_str(ST_BEG_RET):
                 ret = CCode('return ')
                 ret += self.pop_value() # TODO! fucking annotate `pop_var_name` and all those shits with YCodeValue or YCodeVarname or some shit like that
                 ret += CC_SEMICOLON_NEWLINE
@@ -398,16 +398,16 @@ class Src:
             
             # val/var
 
-            if statement_begin in [ST_BEG_VAL, ST_BEG_VAR]:
+            if statement_begin.matches_str(ST_BEG_VAL) or statement_begin.matches_str(ST_BEG_VAR):
                 var_name, var_type = self.pop_var_name_and_type()
 
-                c_var_name = varname_to_ccode(var_name)
+                c_var_name = var_name.to_ccode()
 
-                c_var_type = type_to_ccode(var_type)
+                c_var_type = var_type.to_ccode()
 
                 c_var_value = self.pop_value()
 
-                const_prefix = CCode('const ') if statement_begin == ST_BEG_VAL else CCode('') # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
+                const_prefix = CCode('const ') if statement_begin.matches_str(ST_BEG_VAL) else CCode('') # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
 
                 ret = CCode('')
                 ret += const_prefix
@@ -421,13 +421,15 @@ class Src:
 
             # variable increase/decrease
 
-            if statement_begin in [ST_BEG_INC, ST_BEG_DEC]:
-                var_name = self.pop_var_name()
-                c_var_name = varname_to_ccode(var_name)
+            if statement_begin.matches_str(ST_BEG_INC) or statement_begin.matches_str(ST_BEG_DEC):
+                vn = self.pop_var_name()
+                assert vn is not True
+
+                c_var_name = vn.to_ccode()
 
                 c_value = self.pop_value()
 
-                c_change = CCode('+=') if statement_begin == ST_BEG_INC else CCode('-=')
+                c_change = CCode('+=') if statement_begin.matches_str(ST_BEG_INC) else CCode('-=')
 
                 ret = CCode('')
                 ret += c_var_name
@@ -438,9 +440,10 @@ class Src:
             
             # cast
 
-            if statement_begin == ST_BEG_CAST:
+            if statement_begin.matches_str(ST_BEG_CAST):
                 var = self.pop_var_name()
-                c_var = varname_to_ccode(var)
+                assert var is not True
+                c_var = var.to_ccode()
 
                 self.pop_var_type_sep(var)
 
@@ -461,7 +464,7 @@ class Src:
             
             # if
 
-            if statement_begin == ST_BEG_IF:
+            if statement_begin.matches_str(ST_BEG_IF):
                 cond = self.pop_value()
 
                 err, code = self.pop_code_block()
@@ -480,7 +483,7 @@ class Src:
 
             # fn call
 
-            fn_name = FnName(statement_begin)
+            fn_name = statement_begin.to_FnName()
 
             if self.function_name_in_register(fn_name):
                 # TODO!!! then check the full fnc signature
@@ -489,7 +492,7 @@ class Src:
 
                 c_fn_name = fn_name.to_ccode()
 
-                fn_call_args_ctuple = self.pop_fn_call_args(statement_begin)
+                fn_call_args_ctuple = self.pop_fn_call_args(fn_name)
                 c_fn_args = ctuple_to_ccallargs(fn_call_args_ctuple)
 
                 ret = CCode('')
@@ -524,43 +527,39 @@ class Src:
 
     def pop_fn_name(self) -> FnName:
         var_name = self.pop_var_name()
-        return FnName(var_name)
+        assert var_name is not True
+        return var_name.to_FnName()
 
-    def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[FnName, bool, str]:
+    def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[FnName, bool, VarName]: # TODO!!!! make RetType into its own thing
         name = self.pop_fn_name()
         canreterr = self.pop_fn_type_sep(name)
         typ = self.pop_type()
-        return name, canreterr ,typ
+        return name, canreterr, typ
 
     # pop: fn arg
 
     # returns False if error
     def popif_fn_arg_begin(self) -> bool:
         fn_arg_begin = self.popif_var_name(orr=FN_ARG_BEGIN)
-        ret = (fn_arg_begin == FN_ARG_BEGIN)
-        if not ret:
-            if fn_arg_begin is not None:
-                self.unpop_var_name(fn_arg_begin)
-        return ret
+        self.unpop_var_name(fn_arg_begin)
+
+        return fn_arg_begin is True
 
     def pop_fn_arg_begin(self) -> None:
         assert self.popif_fn_arg_begin() is True
 
-    def pop_fn_def_arg_or_end(self) -> None|tuple[str,str]:
+    def pop_fn_def_arg_or_end(self) -> None|tuple[VarName,VarName]: # TODO!!!! its stupid that this returns None, it needs to return True instead
         name_and_type = self.pop_var_name_and_type_orr(orr=FN_ARG_END)
-        if name_and_type == FN_ARG_END:
+        if name_and_type is True:
             return None
 
-        assert isinstance(name_and_type, tuple)
-        # make mypy happy
-        
         return name_and_type
 
-    def popif_fn_def_args(self) -> None|tuple[tuple[str,str], ...]:
+    def popif_fn_def_args(self) -> None|tuple[tuple[VarName,VarName], ...]:
         if not self.popif_fn_arg_begin():
             return None
 
-        args = []
+        args:list[tuple[VarName,VarName]] = []
         while True:
             arg = self.pop_fn_def_arg_or_end()
             if arg is None:
@@ -569,10 +568,10 @@ class Src:
 
         return tuple(args)
 
-    def pop_fn_def_args(self) -> tuple[tuple[str,str], ...]:
+    def pop_fn_def_args(self) -> tuple[tuple[VarName,VarName], ...]:
         self.pop_fn_arg_begin()
 
-        args = []
+        args:list[tuple[VarName,VarName]] = []
         while True:
             arg = self.pop_fn_def_arg_or_end()
             if arg is None:
@@ -592,8 +591,8 @@ class Src:
         
         self.err('could not get function declaration args, tried both definition args and macro args')
 
-    def pop_fn_call_args(self, fn_name:str) -> tuple[CCode, ...]:
-        return self.pop_tuple(f'could not get function `{fn_name}`\'s call args')
+    def pop_fn_call_args(self, fn_name:FnName) -> tuple[CCode, ...]:
+        return self.pop_tuple(f'could not get function `{fn_name.to_str()}`\'s call args')
 
     # pop: fn body
 
@@ -650,7 +649,7 @@ def main() -> None:
 
             metatype = src.pop_var_metatype()
 
-            if metatype == MT_FN_DEF:
+            if metatype.matches_str(MT_FN_DEF):
 
                 # name and return type
 
@@ -658,7 +657,7 @@ def main() -> None:
 
                 if fn_can_ret_err:
                     src.write_ccode(CC_WARNUNUSEDRESULT_SPACE) # `-Wunused-result` doesn't do the trick
-                src.write_ccode(type_to_ccode(fn_ret_type))
+                src.write_ccode(fn_ret_type.to_ccode())
                 src.write_ccode(CC_SPACE)
                 src.write_ccode(fn_name.to_ccode())
 
@@ -681,13 +680,13 @@ def main() -> None:
                 src.write_ccode(body)
                 src.write_ccode(CCode('\n}\n'))
 
-            elif metatype == MT_FN_DEC:
+            elif metatype.matches_str(MT_FN_DEC):
 
                 fn_name, fn_can_ret_err, ret_type = src.pop_fn_name_and_canreterr_and_rettype()
 
                 c_fn_name = fn_name.to_ccode()
 
-                c_ret_type = type_to_ccode(ret_type)
+                c_ret_type = ret_type.to_ccode()
 
                 fn_args = src.pop_fn_dec_args()
                 # TODO!! the fact that this always returns CCode makes the error messages much less understandable
