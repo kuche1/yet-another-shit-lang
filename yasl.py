@@ -6,10 +6,8 @@
 #       perhaps we could declare them as int&a or something like that
 # TODO make the err msgs colorful, for example the different prototype err could higlight the exact reason, in if the reterr missmatches the : and ! could be in red
 
-# TODO split this file
 # TODO fix all the `!` todos and a coupld of the regular ones
-# TODO write function body inplace instead of returning a billion times
-# TODO maybe I should give up on the stupid `fib(1)` variables and just use separators instead of that stupid `orr=`
+# TODO ? write function body inplace instead of returning a billion times
 # TODO implement normal + -
 
 # from typing import NewType

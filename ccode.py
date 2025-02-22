@@ -16,7 +16,7 @@ class CCode:
         self.val += other.val
         return self
     
-    def __repr__(self) -> str:
+    def __repr__(self) -> str: # TODO as of 2025.02.22 we're still relying on this in the code, the affected code needs to use `as_str` instead
         assert False, 'calling __repr__ on CCode'
         return f'{self.val}'
 
