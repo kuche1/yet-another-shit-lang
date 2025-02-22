@@ -1,7 +1,5 @@
 #! /usr/bin/env python3
 
-# TODO!!!! split `pop_var_name` into 2 functions - `pop_var_name` and `pop_var_name_orr`
-
 # TODO add something like `obj@add` and that would be syntax sugar for `obj_add_$int$(obj, a)` where `int` is infered by the type of `a`
 # TODO add some checks for `pop_type` and `pop_ctype` (actually im not sure this one needs any checks)
 # TODO add the ability to make vars mutable, and if they are mutable pass them as reference (we would also need to track all variables so that when that variable is used we would know to automatically dereference it)
@@ -141,7 +139,7 @@ class Src:
     # pop: type separator
 
     def pop_var_type_sep(self, var_name:VarName) -> None:
-        sep = self.pop_var_name(orr=VAR_TYPE_SEP)
+        sep = self.pop_var_name_orr(orr=VAR_TYPE_SEP)
         self.unpop_var_name(sep)
         if sep is not True:
             self.err(f'variable `{var_name.to_str()}`: expected a type seperator `{VAR_TYPE_SEP}`, instead got `{sep}`')
@@ -219,9 +217,7 @@ class Src:
 
         return VarName(data)
 
-    # TODO this name is missleading, it's not really just "variable name", see where its used
-    # TODO! this has been fucking me over for some time now...
-    def pop_var_name(self, *, orr:None|str=None) -> Literal[True]|VarName:
+    def pop_var_name_orr(self, *, orr:None|str) -> Literal[True]|VarName:
         name = self.popif_var_name(orr=orr)
         
         if name is None:
@@ -234,6 +230,12 @@ class Src:
             return True
 
         return name
+
+    # TODO this name is missleading, it's not really just "variable name", see where its used
+    def pop_var_name(self) -> VarName:
+        name = self.pop_var_name_orr(orr=None)
+        assert name is not True
+        return name
     
     # the input of this needs to be the same as the output of `pop_var_name`
     def unpop_var_name(self, name:None|Literal[True]|VarName) -> None:
@@ -244,7 +246,7 @@ class Src:
     # pop: var name and type
 
     def pop_var_name_and_type_orr(self, *, orr:None|str=None) -> Literal[True]|tuple[VarName, Type]:
-        name = self.pop_var_name(orr=orr)
+        name = self.pop_var_name_orr(orr=orr)
         if name is True:
             return True
 
@@ -263,7 +265,6 @@ class Src:
 
     def pop_var_metatype(self) -> VarName:
         ret = self.pop_var_name()
-        assert ret is not True
         return ret
 
     # pop: value
@@ -364,7 +365,7 @@ class Src:
     # pop: code block
 
     def pop_statement_beginning(self, *, orr:None|str=None) -> Literal[True]|VarName:
-        return self.pop_var_name(orr=orr)
+        return self.pop_var_name_orr(orr=orr)
 
     # 1st return value is err, 2nd is what we got instead
     def pop_code_block_begin(self) -> tuple[bool,str]:
@@ -423,12 +424,9 @@ class Src:
 
             if statement_begin.matches_str(ST_BEG_INC) or statement_begin.matches_str(ST_BEG_DEC):
                 vn = self.pop_var_name()
-                assert vn is not True
 
                 c_var_name = vn.to_ccode()
-
                 c_value = self.pop_value()
-
                 c_change = CCode('+=') if statement_begin.matches_str(ST_BEG_INC) else CCode('-=')
 
                 ret = CCode('')
@@ -442,7 +440,6 @@ class Src:
 
             if statement_begin.matches_str(ST_BEG_CAST):
                 var = self.pop_var_name()
-                assert var is not True
                 c_var = var.to_ccode()
 
                 self.pop_var_type_sep(var)
@@ -526,7 +523,6 @@ class Src:
 
     def pop_fn_name(self) -> FnName:
         var_name = self.pop_var_name()
-        assert var_name is not True
         return var_name.to_FnName()
 
     def pop_fn_name_and_canreterr_and_rettype(self) -> tuple[FnName, bool, Type]:
