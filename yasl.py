@@ -269,7 +269,7 @@ class Src:
 
     # pop: value
 
-    def pop_value_orr(self, *, orr:None|str) -> Literal[True]|CCode:
+    def pop_value_orr(self, *, orr:None|str) -> Literal[True]|Value:
         # TODO not taking care of `"`
         # TODO not taking care of \X
 
@@ -315,26 +315,35 @@ class Src:
         # TODO!! we should be checking if the function can return an error, and if it can we should raise a compiletime error that the value was used before it was checked
         fncargs = self.popif_tuple()
         if fncargs is None:
-            return value_to_ccode(value)
+            var_name_or_value = value
+            var_type = self.get_var_type(var_name_or_value)
+            var = Var(var_name_or_value, var_type)
+            return Value(var)
 
-        # is a function call # TODO!!!! actually, maybe it would be better if we created a variable and stored the function return value in that variable rather than calling the function right away
-        c_fn_name = FnName(value).to_ccode() # TODO if we are to implement anonymous functions this needs to change
-        c_fn_args = ctuple_to_ccallargs(fncargs)
-        ret = CCode('')
-        ret += c_fn_name
-        ret += CC_OB
-        ret += c_fn_args
-        ret += CC_CB
-        return ret
+        # TODO!!!! delete BUT PRESERVE COMMENTS IF THEY MAKE SENSE
+        # # is a function call # TODO!!!! actually, maybe it would be better if we created a variable and stored the function return value in that variable rather than calling the function right away
+        # c_fn_name = FnName(value).to_ccode() # TODO if we are to implement anonymous functions this needs to change
+        # c_fn_args = ctuple_to_ccallargs(fncargs)
+        # ret = CCode('')
+        # ret += c_fn_name
+        # ret += CC_OB
+        # ret += c_fn_args
+        # ret += CC_CB
+        # return ret
 
-    def pop_value(self) -> CCode:
+        fn_name = FnName(value)
+        fn_args = fncargs
+        fn_call = FnCall(fn_name, fn_args)
+        return Value(fn_call)
+
+    def pop_value(self) -> Value:
         ret = self.pop_value_orr(orr=None)
         assert ret is not True # make mypy happy
         return ret
 
     # pop: tuple
 
-    def popif_tuple(self) -> None|tuple[CCode, ...]:
+    def popif_tuple(self) -> None|tuple[Value, ...]:
         # TODO we're not taking care of string
         # TODO actually, anything with space doesnt work (like `(void * ) a` or `a + b`)
 
@@ -348,7 +357,7 @@ class Src:
     
         self.src = self.src[1:]
 
-        the_tuple:list[CCode] = []
+        the_tuple:list[Value] = []
         while True:
             item = self.pop_value_orr(orr=TUPLE_END)
             if item is True:
@@ -356,7 +365,7 @@ class Src:
             the_tuple.append(item)
         return tuple(the_tuple)
 
-    def pop_tuple(self, err:str) -> tuple[CCode, ...]:
+    def pop_tuple(self, err:str) -> tuple[Value, ...]:
         data = self.popif_tuple()
         if data is None:
             self.err(f'{err}: expected a tuple beginning `{TUPLE_BEGIN}`')
@@ -393,7 +402,7 @@ class Src:
 
             if statement_begin.matches_str(ST_BEG_RET):
                 ret = CCode('return ')
-                ret += self.pop_value() # TODO! fucking annotate `pop_var_name` and all those shits with YCodeValue or YCodeVarname or some shit like that
+                ret += self.pop_value().to_ccode() # TODO! fucking annotate `pop_var_name` and all those shits with YCodeValue or YCodeVarname or some shit like that
                 ret += CC_SEMICOLON_NEWLINE
                 return ret
             
@@ -406,7 +415,7 @@ class Src:
 
                 c_var_type = var_type.to_ccode()
 
-                c_var_value = self.pop_value()
+                c_var_value = self.pop_value().to_ccode()
 
                 const_prefix = CCode('const ') if statement_begin.matches_str(ST_BEG_VAL) else CCode('') # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
 
@@ -426,7 +435,7 @@ class Src:
                 vn = self.pop_var_name()
 
                 c_var_name = vn.to_ccode()
-                c_value = self.pop_value()
+                c_value = self.pop_value().to_ccode()
                 c_change = CCode('+=') if statement_begin.matches_str(ST_BEG_INC) else CCode('-=')
 
                 ret = CCode('')
@@ -446,16 +455,16 @@ class Src:
 
                 new_c_type = self.pop_c_type(var)
 
-                cast_from = self.pop_value()
+                previous_value = self.pop_value()
 
-                ret = CCode('')
-                ret += new_c_type # TODO and what if it needs to be a constant ?
+                ret = CCode('') # TODO and what if it needs to be a constant ?
+                ret += new_c_type
                 ret += c_var
                 ret += CC_ASSIGN
                 ret += CC_OB
                 ret += new_c_type
                 ret += CC_CB
-                ret += cast_from
+                ret += previous_value.to_ccode()
                 ret += CC_SEMICOLON_NEWLINE
                 return ret
             
@@ -470,7 +479,7 @@ class Src:
                 assert isinstance(code, CCode) # make mypy happy
 
                 ret = CCode('if(')
-                ret += cond
+                ret += cond.to_ccode()
                 ret += CC_CB
                 ret += CC_CBO
                 ret += code
@@ -490,7 +499,7 @@ class Src:
                 c_fn_name = fn_name.to_ccode()
 
                 fn_call_args_ctuple = self.pop_fn_call_args(fn_name)
-                c_fn_args = ctuple_to_ccallargs(fn_call_args_ctuple)
+                c_fn_args = valuetuple_to_ccallargs(fn_call_args_ctuple)
 
                 ret = CCode('')
                 ret += c_fn_name
@@ -587,7 +596,7 @@ class Src:
         
         self.err('could not get function declaration args, tried both definition args and macro args')
 
-    def pop_fn_call_args(self, fn_name:FnName) -> tuple[CCode, ...]:
+    def pop_fn_call_args(self, fn_name:FnName) -> tuple[Value, ...]:
         return self.pop_tuple(f'could not get function `{fn_name.to_str()}`\'s call args')
 
     # pop: fn body
@@ -622,6 +631,14 @@ class Src:
         assert MACRO_BODY_BEGIN not in macro
 
         return CCode(macro)
+
+    # i don't even know anymore
+
+    def get_var_type(self, var:str) -> Type:
+        if is_str(var):
+            return TYPE_STR
+
+        return TYPE_ANY # TODO!!! get back to this when we have started tracking all the vars
 
 ###
 ### main

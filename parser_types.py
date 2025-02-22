@@ -131,7 +131,13 @@ class Type(BaseParserThingClass):
         return VarName(self.typ).to_ccode()
 
     def matches(self, other:Self) -> bool:
+        if self.typ == 'any' or other.typ == 'any':
+            return True
+
         return self.typ == other.typ
+
+TYPE_STR = Type('str')
+TYPE_ANY = Type('any') # special placeholder type that needs to go later
 
 ######
 ###### fn decl args
@@ -182,35 +188,114 @@ class FnDeclArgs(BaseParserThingClass):
         self.args.append(arg)
         return False, ''
 
+# TODO!!!! delete if it seems that this is useless
+# ######
+# ###### tuple
+# ######
+
+# class Tuple(BaseParserThingClass):
+
+#     def __init__(self) -> None:
+#         self.value:list[Value] = []
+
+######
+###### var
+######
+
+class Var(BaseParserThingClass):
+
+    def __init__(self, name_or_value:str, typ:Type):
+        self.name_or_value = name_or_value
+        self.typ = typ
+    
+    def to_str(self) -> str:
+        return f'{self.name_or_value}{VAR_TYPE_SEP}{self.typ.to_str()}'
+
+    def to_ccode(self) -> CCode:
+        if self.typ.to_str() == TYPE_STR.to_str(): # kinda hacky but we can't use `matches`
+            return CCode('"' + self.name_or_value[1:-1] + '"')
+        else:
+            return VarName(self.name_or_value).to_ccode() # needed so that we can have shit like `(` in the variable name
+
+######
+###### fn call
+######
+
+class FnCall(BaseParserThingClass):
+
+    def __init__(self, name:FnName, args:tuple['Value', ...]):
+        self.name = name
+        self.args = args
+
+    def to_str(self) -> str:
+        call = ', '.join([arg.to_str() for arg in self.args])
+        if call.endswith(', '):
+            call = call[:-2]
+
+        return f'{self.name.to_str()}{TUPLE_BEGIN}{call}{TUPLE_END}'
+
+    def to_ccode(self) -> CCode:
+        print(f'dbg: translating function call: function name {self.name.to_str()}')
+        ret = self.name.to_ccode()
+
+        ret += CC_OB
+
+        for arg in self.args:
+            print(f'dbg: translating function call: argument {arg.to_str()}')
+            ret += arg.to_ccode()
+            ret += CC_COMMA_SPACE
+
+        ret.del_if_endswith(CC_COMMA_SPACE)
+
+        ret += CC_CB
+
+        return ret
+
+######
+###### value
+######
+
+class Value(BaseParserThingClass):
+
+    def __init__(self, value:Var|FnCall):
+        self.value = value
+    
+    def to_str(self) -> str:
+        return self.value.to_str()
+    
+    def to_ccode(self) -> CCode:
+        return self.value.to_ccode()
+
 ######
 ###### str to CCode converters
 ######
 # TODO!!!! all of these functions need to go, instead the appropriate `.to_` method needs to be implemented on the given class (when we decide to do that: we needto use __all__ and exclude all these function)
 
-def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
-    ret = CCode('')
-
-    for val in args:
-        ret += value_to_ccode(val)
-        ret += CC_COMMA_SPACE
-
-    ret.del_if_endswith(CC_COMMA_SPACE)
-
-    return ret
-
 def value_to_ccode(value:str) -> CCode:
-    if value.startswith(STRING):
-        assert value.endswith(STRING)
-        assert len(value) >= 2
-        assert value[1:-1].count(STRING) == 0
-        assert value[1:-1].count('"') == 0
+    if is_str(value):
         return CCode('"' + value[1:-1] + '"')
     return VarName(value).to_ccode()
 
-def ctuple_to_ccallargs(args:tuple[CCode, ...]) -> CCode:
+def valuetuple_to_ccallargs(args:tuple[Value, ...]) -> CCode:
     ret = CCode('')
     for arg in args:
         ret += CC_COMMA_SPACE
-        ret += arg
+        ret += arg.to_ccode()
     ret.del_if_startswith(CC_COMMA_SPACE)
     return ret
+
+######
+###### string check
+######
+
+def is_str(obj:str) -> bool:
+    if isinstance(obj, str):
+        if obj.startswith(STRING):
+            assert obj.endswith(STRING)
+            assert len(obj) >= 2
+            assert obj[1:-1].count(STRING) == 0
+            assert obj[1:-1].count('"') == 0
+            return True
+        return False
+    else:
+        assert False
