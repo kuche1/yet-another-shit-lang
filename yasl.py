@@ -548,10 +548,10 @@ class Src:
     def pop_fn_arg_begin(self) -> None:
         assert self.popif_fn_arg_begin() is True
 
-    def pop_fn_def_arg_or_end(self) -> None|tuple[VarName,VarName]: # TODO!!!! its stupid that this returns None, it needs to return True instead
+    def pop_fn_def_arg_or_end(self) -> Literal[True]|tuple[VarName,VarName]:
         name_and_type = self.pop_var_name_and_type_orr(orr=FN_ARG_END)
         if name_and_type is True:
-            return None
+            return True
 
         return name_and_type
 
@@ -562,7 +562,7 @@ class Src:
         args:list[tuple[VarName,VarName]] = []
         while True:
             arg = self.pop_fn_def_arg_or_end()
-            if arg is None:
+            if arg is True:
                 break
             args.append(arg)
 
@@ -574,7 +574,7 @@ class Src:
         args:list[tuple[VarName,VarName]] = []
         while True:
             arg = self.pop_fn_def_arg_or_end()
-            if arg is None:
+            if arg is True:
                 break
             args.append(arg)
 
