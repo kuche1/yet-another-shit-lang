@@ -550,32 +550,41 @@ class Src:
 
         return name_and_type
 
-    def popif_fn_def_args(self) -> None | tuple[tuple[VarName,Type], ...]:
+    def popif_fn_def_args(self) -> None | FnDeclArgs:
         if not self.popif_fn_arg_begin():
             return None
 
-        args:list[tuple[VarName,Type]] = []
+        args = FnDeclArgs()
         while True:
             arg = self.pop_fn_def_arg_or_end()
             if arg is True:
                 break
-            args.append(arg)
 
-        return tuple(args)
+            name, typ = arg
+            err, reason = args.add_another(name, typ)
+            if err:
+                self.err(reason)
 
-    def pop_fn_def_args(self) -> tuple[tuple[VarName,Type], ...]:
+        return args
+
+    def pop_fn_def_args(self) -> FnDeclArgs:
         ret = self.popif_fn_def_args()
         assert ret is not None
         return ret
 
+    # this does include the surrounding `(` and `)`
     def pop_fn_dec_args(self) -> CCode:
         args = self.popif_fn_def_args()
         if args is not None:
-            return argtuple_to_cdeclargs(args)
+            return args.to_ccode()
 
         body = self.popif_macro_body()
         if body is not None:
-            return body
+            ret = CCode('')
+            ret += CC_OB
+            ret += body
+            ret += CC_CB
+            return ret
         
         self.err('could not get function declaration args, tried both definition args and macro args')
 
@@ -651,10 +660,8 @@ def main() -> None:
 
                 # args
 
-                src.write_ccode(CC_OB)
                 args = src.pop_fn_def_args()
-                src.write_ccode(argtuple_to_cdeclargs(args))
-                src.write_ccode(CC_CB)
+                src.write_ccode(args.to_ccode())
 
                 # register
 
@@ -687,9 +694,7 @@ def main() -> None:
                 src.write_ccode(c_ret_type)
                 src.write_ccode(CC_SPACE)
                 src.write_ccode(c_fn_name)
-                src.write_ccode(CC_OB)
                 src.write_ccode(fn_args) # we could have used `()` but unfortunately this doesnt work for stdlib fncs (line printf)
-                src.write_ccode(CC_CB)
                 src.write_ccode(CC_SEMICOLON_NEWLINE)
 
             else:

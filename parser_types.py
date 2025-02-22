@@ -109,11 +109,11 @@ class FnName(BaseParserThingClass):
     def to_str(self) -> str:
         return f'{self.name}'
 
-    def matches(self, other:Self) -> bool:
-        return self.name == other.name
-    
     def to_ccode(self) -> CCode:
         return VarName(self.name).to_ccode()
+
+    def matches(self, other:Self) -> bool:
+        return self.name == other.name
 
 ######
 ###### type
@@ -127,11 +127,58 @@ class Type(BaseParserThingClass):
     def to_str(self) -> str:
         return f'{self.typ}'
 
-    def matches(self, other:Self) -> bool:
-        return self.typ == other.typ
-    
     def to_ccode(self) -> CCode:
         return VarName(self.typ).to_ccode()
+
+    def matches(self, other:Self) -> bool:
+        return self.typ == other.typ
+
+######
+###### fn decl args
+######
+
+class FnDeclArgs(BaseParserThingClass):
+
+    def __init__(self) -> None:
+        self.args:list[tuple[VarName,Type]] = []
+
+    def to_str(self) -> str:
+        ret = ''
+
+        for name, typ in self.args:
+            ret += f'{name.to_str()}:{typ.to_str()}, '
+
+        if ret.endswith(', '):
+            ret = ret[:-2]
+
+        ret = f'{FN_ARG_BEGIN}{ret}{FN_ARG_END}'
+
+        return ret
+
+    def to_ccode(self) -> CCode:
+        ret = CCode('(')
+
+        if len(self.args) == 0:
+            ret += CCode('void')
+        else:
+            for arg_name, arg_type in self.args:
+                ret += arg_type.to_ccode()
+                ret += CC_SPACE
+                ret += arg_name.to_ccode()
+                ret += CC_COMMA_SPACE
+            ret.del_if_endswith(CC_COMMA_SPACE)
+
+        ret += CCode(')')
+        return ret
+
+    # 1st ret is err, 2nd ret is reason
+    def add_another(self, var_name:VarName, var_type:Type) -> tuple[bool, str]: # TODO!!!! var_name and var_type need to be in a tuple
+        for name, typ in self.args:
+            if name.matches(var_name):
+                return True, f'argument {var_name.to_str()} already specified'
+
+        self.args.append((var_name, var_type))
+        return False, ''
 
 ######
 ###### str to CCode converters
@@ -146,21 +193,6 @@ def argtuple_to_ccallargs(args:tuple[str, ...]) -> CCode:
         ret += CC_COMMA_SPACE
 
     ret.del_if_endswith(CC_COMMA_SPACE)
-
-    return ret
-
-def argtuple_to_cdeclargs(args:tuple[tuple[VarName, Type], ...]) -> CCode:
-    ret = CCode('')
-
-    if len(args) == 0:
-        ret += CCode('void')
-    else:
-        for arg_name, arg_type in args:
-            ret += arg_type.to_ccode()
-            ret += CC_SPACE
-            ret += arg_name.to_ccode()
-            ret += CC_COMMA_SPACE
-        ret.del_if_endswith(CC_COMMA_SPACE)
 
     return ret
 

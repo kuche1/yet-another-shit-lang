@@ -6,7 +6,7 @@ from parser_types import *
 
 class FnSignature:
 
-    def __init__(self, name:FnName, can_ret_err:bool, return_type:Type, args:CCode|tuple[tuple[VarName,Type], ...]) -> None:
+    def __init__(self, name:FnName, can_ret_err:bool, return_type:Type, args:CCode|FnDeclArgs) -> None:
         self.name = name
         self.can_ret_err = can_ret_err
         self.return_type = return_type
@@ -14,18 +14,7 @@ class FnSignature:
 
     def __repr__(self) -> str:
         err_type = FTS_ERR if self.can_ret_err else FTS_NO_ERR
-
-        if isinstance(self.args, CCode):
-            args = f'({self.args.to_str()})'
-        else:
-            args = ''
-            for name, typ in self.args:
-                args += f'{name}:{typ}, '
-            if args.endswith(', '):
-                args = args[:-2]
-            args = f'[{args}]'
-
-        return f'`fn {self.name.to_str()}{err_type}{self.return_type.to_str()} {args}`'
+        return f'`fn {self.name.to_str()}{err_type}{self.return_type.to_str()} {self.args.to_str()}`'
 
     def __eq__(self, other:object) -> NoReturn:
         assert False, f'trying to call __eq__ on FnSignature'
