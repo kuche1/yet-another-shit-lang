@@ -367,12 +367,12 @@ class Src:
         return self.pop_var_name(orr=orr)
 
     # 1st return value is err, 2nd is what we got instead
-    def pop_code_block_begin(self) -> tuple[Literal[True],str] | tuple[Literal[False],None]: # TODO!!!! this needs to be streamlined to tuple[bool,str]
+    def pop_code_block_begin(self) -> tuple[bool,str]:
         fn_body_begin = self.popif_var_name(orr=CODE_BLOCK_BEGIN)
         self.unpop_var_name(fn_body_begin)
 
         if fn_body_begin is True:
-            return False, None
+            return False, ''
         
         if fn_body_begin is None:
             return True, '<end of input reached>'
@@ -510,7 +510,6 @@ class Src:
     def pop_code_block(self) -> tuple[Literal[True],str] | tuple[Literal[False],CCode]:
         err, instead_got = self.pop_code_block_begin()
         if err:
-            assert isinstance(instead_got, str) # make mypy happy
             return True, instead_got
 
         data:CCode = CCode('')
