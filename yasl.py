@@ -2,6 +2,9 @@
 
 # TODO add something like `obj@add` and that would be syntax sugar for `obj_add_$int$(obj, a)` where `int` is infered by the type of `a`
 # TODO add some checks for `pop_type` and `pop_ctype` (actually im not sure this one needs any checks)
+# TODO add the ability to make vars mutable, and if they are mutable pass them as reference (we would also need to track all variables so that when that variable is used we would know to automatically dereference it)
+#       perhaps we could declare them as int&a or something like that
+# TODO make the err msgs colorful, for example the different prototype err could higlight the exact reason, in if the reterr missmatches the : and ! could be in red
 
 # TODO split this file
 # TODO fix all the `!` todos and a coupld of the regular ones
