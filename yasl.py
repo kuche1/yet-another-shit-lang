@@ -317,7 +317,7 @@ class Src:
         if fncargs is None:
             return value_to_ccode(value)
 
-        # is a function call
+        # is a function call # TODO!!!! actually, maybe it would be better if we created a variable and stored the function return value in that variable rather than calling the function right away
         c_fn_name = FnName(value).to_ccode() # TODO if we are to implement anonymous functions this needs to change
         c_fn_args = ctuple_to_ccallargs(fncargs)
         ret = CCode('')
