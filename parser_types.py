@@ -47,7 +47,7 @@ class CCode:
             self.val = self.val[len(start.val):]
 
 CC_SPACE = CCode(' ')
-CC_SEMICOLON_NEWLINE = CCode(';\n')
+CC_SEMICOLON_NL = CCode(';\n')
 CC_ASSIGN = CCode(' = ')
 CC_OB = CCode('(')
 CC_CB = CCode(')')
@@ -258,7 +258,7 @@ class Var(BaseParserThingClass):
 
 class FnCall(BaseParserThingClass):
 
-    # TODO!!! actually, it wouldn't be a bad idea if we actually passed the signature here so that the check can happen inside instead of having it in 200 different places (that would also mean clearing that other place where they are checked manually (see pop_code_block_element))
+    # TODO!!!! actually, it wouldn't be a bad idea if we actually passed the signature here so that the check can happen inside instead of having it in 200 different places (that would also mean clearing that other place where they are checked manually (see pop_code_block_element))
     def __init__(self, name:FnName, args:'ValueTuple', ret_type:Type):
         self.name = name
         self.args = args

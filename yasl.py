@@ -443,7 +443,7 @@ class Src:
             if statement_begin.matches_str(ST_BEG_RET):
                 ret = CCode('return ')
                 ret += self.pop_value().to_ccode() # TODO! fucking annotate `pop_var_name` and all those shits with YCodeValue or YCodeVarname or some shit like that
-                ret += CC_SEMICOLON_NEWLINE
+                ret += CC_SEMICOLON_NL
                 return ret
             
             # val/var
@@ -463,7 +463,7 @@ class Src:
                 ret += var_name.to_ccode()
                 ret += CC_ASSIGN
                 ret += c_var_value
-                ret += CC_SEMICOLON_NEWLINE
+                ret += CC_SEMICOLON_NL
                 return ret
 
             # variable increase/decrease
@@ -479,7 +479,7 @@ class Src:
                 ret += c_var_name
                 ret += c_change
                 ret += c_value
-                ret += CC_SEMICOLON_NEWLINE
+                ret += CC_SEMICOLON_NL
                 return ret
             
             # cast
@@ -503,7 +503,7 @@ class Src:
                 ret += new_c_type
                 ret += CC_CB
                 ret += previous_value.to_ccode()
-                ret += CC_SEMICOLON_NEWLINE
+                ret += CC_SEMICOLON_NL
                 return ret
             
             # if
@@ -563,10 +563,8 @@ class Src:
                 if not decl_args.matches(call_args):
                     self.err(f'declaration args do not match call args for function `{fn_name.to_str()}`: `{decl_args.to_str()}` and `{call_args.to_str()}`')
 
-                ret = CCode('')
-                ret += fn_name.to_ccode()
-                ret += fn_call_args.to_ccode()
-                ret += CC_SEMICOLON_NEWLINE
+                ret = FnCall(fn_name, fn_call_args, existing_sig.get_ret_type()).to_ccode() # yeah, this seems stupid but I want all fnc calls going trougn `FnCall` so that later we can pass the signature of the actual function and have shit checked
+                ret += CC_SEMICOLON_NL
                 return ret
             
             # invalid
@@ -780,7 +778,7 @@ def main() -> None:
                 src.write_ccode(CC_SPACE)
                 src.write_ccode(c_fn_name)
                 src.write_ccode(fn_args) # we could have used `()` but unfortunately this doesnt work for stdlib fncs (line printf)
-                src.write_ccode(CC_SEMICOLON_NEWLINE)
+                src.write_ccode(CC_SEMICOLON_NL)
 
             else:
                 
