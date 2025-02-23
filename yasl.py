@@ -129,7 +129,6 @@ class Src:
                 self.err(f'variable `{name.to_str()}` alredy exists')
 
         self.vars[-1].append((name, typ))
-        print(f'dbg: registered variable {name.to_str()}')
 
     def register_FnDeclArgs(self, fn_args:FnDeclArgs) -> None:
         for name, typ in fn_args.generator():
