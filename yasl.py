@@ -56,6 +56,8 @@ class Src:
         self.declared_functions:FnSignatures = FnSignatures()
         self.defined_functions:FnSignatures = FnSignatures()
 
+        # self.vars # TODO!!!! implement variable tracking, this is causing a problem
+
     def __del__(self) -> None:
         self.file_out.close()
 
@@ -307,6 +309,10 @@ class Src:
             value += ch
 
         assert not in_string # should be unreachable
+
+        # TODO!!!! when the dependent code is ready, just create a new variable char* that point to this string and return the variable
+        # if is_str(value):
+        #     ...
 
         # `value` could be a value in itself or a function call
 

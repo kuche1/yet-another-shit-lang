@@ -232,7 +232,7 @@ class FnDeclArgs(BaseParserThingClass):
 class Var(BaseParserThingClass):
 
     def __init__(self, name_or_value:str, typ:Type):
-        self.name_or_value = name_or_value
+        self.name_or_value = name_or_value # TODO!!!! `name_or_value` is stupid and makes everything more complex, it only exists because string can be their own thing and are not put into variables
         self.typ = typ
 
     def to_str(self) -> str:
