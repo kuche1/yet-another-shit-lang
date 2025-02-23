@@ -137,7 +137,7 @@ class Src:
 
     def get_registered_var_type(self, name:VarName) -> Type:
         if is_num(name): # TODO after we implement the thing that makes all "floating values" into actual vars we can remove this
-            return TYPE_ANY # TODO!!! I would LOVE to make a COMPTIME_NUM type or something like that
+            return TYPE_ANY # TODO!!! I would LOVE to make a COMPTIME_NUM type or something like that (keep in mind that we probably cannot just copy-paste the value as we do now, we would have to have something special in `.to_ccode()`)
 
         for vs in self.vars:
             for n, t in vs:
