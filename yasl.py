@@ -514,7 +514,8 @@ class Src:
             # scope
 
             if statement_begin.matches_str(ST_BEG_SCOPE):
-                c_code = self.pop_code_block_nohead()
+                self.scope_enter() # since it was not called automatically
+                c_code = self.pop_code_block_nohead() # will call `self.scope_leave` automatically
 
                 ret = CCode('')
                 ret += CC_CBO
