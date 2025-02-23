@@ -124,6 +124,10 @@ class Src:
                 self.err(f'variable `{name.to_str()}` alredy exists')
 
         self.vars[-1].append((name, typ))
+    
+    # TODO !!!!
+    # def scope_enter
+    # def scope_leave
 
     # pop: whitespace
 
