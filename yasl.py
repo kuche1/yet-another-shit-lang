@@ -113,6 +113,12 @@ class Src:
     
     # register: variables
 
+    def scope_enter(self) -> None:
+        self.vars.append([])
+
+    def scope_leave(self) -> None:
+        del self.vars[-1]
+
     def register_variable(self, name:VarName, typ:Type) -> None:
         all_vars:list[tuple[VarName,Type]] = []
         for v in self.vars:
@@ -123,13 +129,23 @@ class Src:
                 self.err(f'variable `{name.to_str()}` alredy exists')
 
         self.vars[-1].append((name, typ))
+        print(f'dbg: registered variable {name.to_str()}')
+
+    def register_FnDeclArgs(self, fn_args:FnDeclArgs) -> None:
+        for name, typ in fn_args.generator():
+            self.register_variable(name, typ)
+
+    def get_registered_var_type(self, name:VarName) -> Type:
+        if is_num(name): # TODO after we implement the thing that makes all "floating values" into actual vars we can remove this
+            return TYPE_ANY # TODO!!! I would LOVE to make a COMPTIME_NUM type or something like that
+
+        for vs in self.vars:
+            for n, t in vs:
+                if name.matches(n):
+                    return t
+
+        assert False, f'{name.to_str()=}'
     
-    def scope_enter(self) -> None:
-        self.vars.append([])
-
-    def scope_leave(self) -> None:
-        del self.vars[-1]
-
     # pop: whitespace
 
     def pop_whitespace(self) -> None:
@@ -470,17 +486,18 @@ class Src:
 
             if statement_begin.matches_str(ST_BEG_CAST):
                 var = self.pop_var_name()
-                c_var = var.to_ccode()
 
                 self.pop_var_type_sep(var)
 
                 new_c_type = self.pop_c_type(var)
 
+                self.register_variable(var, TYPE_ANY) # because of that `new_c_type` that is CCode
+
                 previous_value = self.pop_value()
 
                 ret = CCode('') # TODO and what if it needs to be a constant ?
                 ret += new_c_type
-                ret += c_var
+                ret += var.to_ccode()
                 ret += CC_ASSIGN
                 ret += CC_OB
                 ret += new_c_type
@@ -684,8 +701,8 @@ class Src:
     def get_var_type(self, var:str) -> Type:
         if is_str(var):
             return TYPE_STR
-
-        return TYPE_ANY # TODO!!! get back to this when we have started tracking all the vars
+        
+        return self.get_registered_var_type(VarName(var))
 
 ###
 ### main
@@ -726,6 +743,9 @@ def main() -> None:
                 args = src.pop_fn_def_args()
                 src.write_ccode(args.to_ccode())
 
+                src.scope_enter()
+                src.register_FnDeclArgs(args)
+
                 # register
 
                 fn_sig = FnSignature(fn_name, fn_can_ret_err, fn_ret_type, args)
@@ -737,6 +757,8 @@ def main() -> None:
                 body = src.pop_fn_body(fn_name)
                 src.write_ccode(body)
                 src.write_ccode(CCode('\n}\n'))
+
+                src.scope_leave()
 
             elif metatype.matches_str(MT_FN_DEC):
 

@@ -1,4 +1,5 @@
 
+from typing import Generator
 from typing import NoReturn
 from typing import Self
 
@@ -213,6 +214,10 @@ class FnDeclArgs(BaseParserThingClass):
         for name, typ in self.args:
             ret.add_another(typ)
         return ret
+    
+    def generator(self) -> Generator[tuple[VarName,Type]]:
+        for arg in self.args:
+            yield arg
 
     # 1st ret is err, 2nd ret is reason
     def add_another(self, arg:tuple[VarName,Type]) -> tuple[bool, str]:
@@ -354,3 +359,18 @@ def is_str(obj:str) -> bool:
         return False
     else:
         assert False
+
+def is_num(obj:str|VarName) -> bool:
+    if isinstance(obj, str):
+        val_str = obj
+    elif isinstance(obj, VarName):
+        val_str = obj.to_str()
+    else:
+        assert False, f'unhandled type {type(obj)}'
+
+    try:
+        float(val_str)
+    except ValueError:
+        return False
+    else:
+        return True
