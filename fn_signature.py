@@ -33,7 +33,7 @@ class FnSignature:
             pass
         else:
             if self.args != other.args:
-                return False, f'arguments: {self.args} != {other.args}' # TODO!!! make this pretty and make a fnc for turning args like that into str
+                return False, f'arguments: {self.args} != {other.args}'
         
         return True, ''
     
