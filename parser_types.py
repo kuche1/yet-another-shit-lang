@@ -1,6 +1,7 @@
 
 from typing import Generator
 from typing import NoReturn
+from typing import Callable
 from typing import Self
 
 from constants import *
@@ -56,6 +57,7 @@ CC_WARNUNUSEDRESULT_SPACE = CCode('__attribute__((warn_unused_result)) ')
 CC_CBO = CCode('{')
 CC_CBC = CCode('}')
 CC_NL = CCode('\n')
+
 
 ######
 ###### base class
@@ -165,7 +167,14 @@ class TypeTuple(BaseParserThingClass):
         if self.any or other.any:
             return True
 
-        return self.vals == other.vals
+        if len(self.vals) != len(other.vals):
+            return False
+        
+        for s_val, o_val in zip(self.vals, other.vals, strict=True):
+            if not s_val.matches(o_val):
+                return False
+        
+        return True
     
     def add_another(self, val:Type) -> None:
         assert not self.any
@@ -258,8 +267,20 @@ class Var(BaseParserThingClass):
 
 class FnCall(BaseParserThingClass):
 
-    # TODO!!!! actually, it wouldn't be a bad idea if we actually passed the signature here so that the check can happen inside instead of having it in 200 different places (that would also mean clearing that other place where they are checked manually (see pop_code_block_element))
-    def __init__(self, name:FnName, args:'ValueTuple', ret_type:Type):
+    # TODO!! I hate the fact taht we have to pass warn an err
+    def __init__(self, name:FnName, args:'ValueTuple', ret_type:Type, original_signature:'FnSignature', warn:Callable[[str],None], err:Callable[[str],NoReturn]):
+
+        if original_signature.get_can_ret_err():
+            warn(f'calling function `{name.to_str()}` that can return error') # TODO!! make the compiler take care of this instead of just printing a warning
+
+        # TODO check return type ?
+
+        decl_args = original_signature.get_arg_types()
+        call_args = args.to_TypeTuple()
+
+        if not decl_args.matches(call_args):
+            err(f'declaration args do not match call args for function `{name.to_str()}`: `{decl_args.to_str()}` and `{call_args.to_str()}`')
+
         self.name = name
         self.args = args
         self.ret_type = ret_type
@@ -345,7 +366,71 @@ class ValueTuple(BaseParserThingClass):
         self.value.append(item)
 
 ######
-###### string check
+###### SPECIAL: fn signature
+######
+
+class FnSignature:
+
+    def __init__(self, name:FnName, can_ret_err:bool, return_type:Type, args:CCode|FnDeclArgs) -> None:
+        self.name = name
+        self.can_ret_err = can_ret_err
+        self.return_type = return_type
+        self.args = args
+
+    def __repr__(self) -> str:
+        err_type = FTS_ERR if self.can_ret_err else FTS_NO_ERR
+        return f'`fn {self.name.to_str()}{err_type}{self.return_type.to_str()} {self.args.to_str()}`'
+
+    def __eq__(self, other:object) -> NoReturn:
+        assert False, f'trying to call __eq__ on FnSignature'
+    def matches(self, other:Self) -> tuple[bool, str]:
+        if not self.name.matches(other.name):
+            return False, f'name missmatch `{self.name.to_str()}` and `{other.name.to_str()}`'
+
+        if self.can_ret_err != other.can_ret_err:
+            return False, 'difference in ability to return an error'
+
+        if not self.return_type.matches(other.return_type):
+            return False, f'return type missmatch `{self.return_type.to_str()}` and `{other.return_type.to_str()}`'
+
+        # if `args` is CCode just give up and pretend they're the same
+        if isinstance(self.args, CCode) or (isinstance(other.args, CCode)):
+            pass
+        else:
+            if self.args != other.args:
+                return False, f'arguments: {self.args} != {other.args}'
+        
+        return True, ''
+    
+    def get_can_ret_err(self) -> bool:
+        return self.can_ret_err
+    
+    def get_arg_types(self) -> TypeTuple:
+        return self.args.to_TypeTuple()
+    
+    def get_ret_type(self) -> Type:
+        return self.return_type
+
+DUMMY_FN_SIGNATURE = FnSignature(FnName('dummy'), False, Type('int'), CCode('(void)'))
+
+class FnSignatures:
+
+    def __init__(self) -> None:
+        self.fns:list[FnSignature] = []
+
+    def get_signature(self, name:FnName) -> tuple[bool, FnSignature]:
+        for fn in self.fns:
+            if name.matches(fn.name):
+                return True, fn
+        return False, DUMMY_FN_SIGNATURE
+
+    def register(self, fn:FnSignature) -> None:
+        found, _sig = self.get_signature(fn.name)
+        assert not found
+        self.fns.append(fn)
+
+######
+###### SPECIAL: string check
 ######
 
 def is_str(obj:str) -> bool:

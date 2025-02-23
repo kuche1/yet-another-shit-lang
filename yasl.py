@@ -19,7 +19,6 @@ import shutil
 import sys
 import os
 
-from fn_signature import *
 from parser_types import *
 from constants import *
 
@@ -346,14 +345,12 @@ class Src:
 
         assert not in_string # should be unreachable
 
-        # TODO!!! when the dependent code is ready, just create a new variable char* that point to this string and return the variable
+        # TODO!! when the dependent code is ready, just create a new variable char* that point to this string and return the variable
         # if is_str(value):
         #     ...
 
         # `value` could be a value in itself or a function call
 
-        # TODO!! we should also be checking if such a function exists
-        # TODO!! we should be checking if the function can return an error, and if it can we should raise a compiletime error that the value was used before it was checked
         fn_args = self.popif_tuple()
         if fn_args is None:
             var_name_or_value = value
@@ -361,15 +358,17 @@ class Src:
             var = Var(var_name_or_value, var_type)
             return Value(var)
 
-        # TODO!!! perhaps it would be better to just create a new vairable and set it to the value returned by the function
+        # TODO!! perhaps it would be better to just create a new vairable and set it to the value returned by the function
+
+        # TODO!!! we should be checking if the function can return an error, and if it can we should raise a compiletime error that the value was used before it was checked
 
         fn_name = FnName(value)
 
         in_register, signature = self.function_name_in_register(fn_name)
         if not in_register:
-            self.err(f'function `{fn_name.to_str()}` not in register')
+            self.err(f'function `{fn_name.to_str()}` does not exist')
         
-        fn_call = FnCall(fn_name, fn_args, signature.get_ret_type())
+        fn_call = FnCall(fn_name, fn_args, signature.get_ret_type(), signature, self.warn, self.err)
         return Value(fn_call)
 
     def pop_value(self) -> Value:
@@ -545,24 +544,13 @@ class Src:
 
             found, existing_sig = self.function_name_in_register(fn_name)
             if found:
-                # TODO!!! then check the full fnc signature
                 # TODO!!! put an assert if the fnc can return an error, maybe take advantage of the c syntax `(val1ignored, val2ignored, val3actualvalue)`
                 # TODO!!! also, make this CCode fnc call code into its own function so that we can use it in that other place (the value popper or the tuple popper or whatever)
 
-                if existing_sig.get_can_ret_err():
-                    self.warn(f'calling function `{fn_name.to_str()}` that can return error') # TODO make the compiler take care of this instead of printing a warning
-
-                # TODO check return type ?
-
                 fn_call_args = self.pop_fn_call_args(fn_name)
+                fn_call = FnCall(fn_name, fn_call_args, existing_sig.get_ret_type(), existing_sig, self.warn, self.err) # yeah, this seems stupid but I want all fnc calls going trougn `FnCall` so that later we can pass the signature of the actual function and have shit checked
 
-                decl_args = existing_sig.get_arg_types()
-                call_args = fn_call_args.to_TypeTuple()
-
-                if not decl_args.matches(call_args):
-                    self.err(f'declaration args do not match call args for function `{fn_name.to_str()}`: `{decl_args.to_str()}` and `{call_args.to_str()}`')
-
-                ret = FnCall(fn_name, fn_call_args, existing_sig.get_ret_type()).to_ccode() # yeah, this seems stupid but I want all fnc calls going trougn `FnCall` so that later we can pass the signature of the actual function and have shit checked
+                ret = fn_call.to_ccode()
                 ret += CC_SEMICOLON_NL
                 return ret
             
