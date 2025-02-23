@@ -56,7 +56,8 @@ class Src:
         self.declared_functions:FnSignatures = FnSignatures()
         self.defined_functions:FnSignatures = FnSignatures()
 
-        self.vars:list[list[tuple[VarName,Type]]] = [[]] # TODO!!!! finish implementation
+        self.vars:list[list[tuple[VarName,Type]]] = [[]] # adding the initial "global scope" just in case
+        # TODO!!!! finish implementation
         # TODO we need to trace scope creation/deletion
 
     def __del__(self) -> None:
@@ -125,9 +126,11 @@ class Src:
 
         self.vars[-1].append((name, typ))
     
-    # TODO !!!!
-    # def scope_enter
-    # def scope_leave
+    def scope_enter(self) -> None:
+        self.vars.append([])
+
+    def scope_leave(self) -> None:
+        del self.vars[-1]
 
     # pop: whitespace
 
@@ -403,6 +406,7 @@ class Src:
         self.unpop_var_name(fn_body_begin)
 
         if fn_body_begin is True:
+            self.scope_enter()
             return False, ''
         
         if fn_body_begin is None:
@@ -417,6 +421,7 @@ class Src:
             # fn body end
 
             if statement_begin is True:
+                self.scope_leave()
                 return None
             
             # ret
@@ -496,13 +501,27 @@ class Src:
                     self.err(f'`{ST_BEG_IF}` statement: could not get code block `{CODE_BLOCK_BEGIN}`, instead got `{code}`')
                 assert isinstance(code, CCode) # make mypy happy
 
-                ret = CCode('if(')
+                ret = CCode('if')
+                ret += CC_OB
                 ret += cond.to_ccode()
                 ret += CC_CB
                 ret += CC_CBO
                 ret += code
                 ret += CC_CBC
-                ret += CC_NEWLINE
+                ret += CC_NL
+                return ret
+
+            # scope
+
+            if statement_begin.matches_str(ST_BEG_SCOPE):
+                c_code = self.pop_code_block_nohead()
+
+                ret = CCode('')
+                ret += CC_CBO
+                ret += CC_NL
+                ret += c_code
+                ret += CC_CBC
+                ret += CC_NL
                 return ret
 
             # fn call
@@ -536,14 +555,11 @@ class Src:
             
             # invalid
 
-            self.err(f'a valid statement beginning needs to be provided; those inclide {STATEMENT_BEGINNINGS}; this could also be a function call (could not find function `{statement_begin}`)')
+            self.err(f'a valid statement beginning needs to be provided; those inclide {STATEMENT_BEGINNINGS}; this could also be a function call (could not find function `{fn_name.to_str()}`)')
 
-    def pop_code_block(self) -> tuple[Literal[True],str] | tuple[Literal[False],CCode]:
-        err, instead_got = self.pop_code_block_begin()
-        if err:
-            return True, instead_got
+    def pop_code_block_nohead(self) -> CCode:
+        data = CCode('')
 
-        data:CCode = CCode('')
         while True:
             body_element:None|CCode = self.pop_code_block_element()
             if body_element is None:
@@ -551,7 +567,14 @@ class Src:
 
             data += body_element
 
-        return False, data
+        return data
+
+    def pop_code_block(self) -> tuple[Literal[True],str] | tuple[Literal[False],CCode]:
+        err, instead_got = self.pop_code_block_begin()
+        if err:
+            return True, instead_got
+        
+        return False, self.pop_code_block_nohead()
 
     # pop: fn_name can_return_error return_type
 

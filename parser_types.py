@@ -54,7 +54,7 @@ CC_COMMA_SPACE = CCode(', ')
 CC_WARNUNUSEDRESULT_SPACE = CCode('__attribute__((warn_unused_result)) ')
 CC_CBO = CCode('{')
 CC_CBC = CCode('}')
-CC_NEWLINE = CCode('\n')
+CC_NL = CCode('\n')
 
 ######
 ###### base class

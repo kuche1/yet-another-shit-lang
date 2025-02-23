@@ -71,6 +71,13 @@ fn main:int [argc:int argv_cpp:char**]
 
     // test123[] // TODO need to add syntax like `!test123[]` that adds a runtime assert
 
+    {
+        val z:int 5
+        printf['z in scope = %d\n' z]
+    }
+    val z:int 6
+    printf['z outside scope = %d\n' z]
+
     ret 0
 }
 
