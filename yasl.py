@@ -56,7 +56,8 @@ class Src:
         self.declared_functions:FnSignatures = FnSignatures()
         self.defined_functions:FnSignatures = FnSignatures()
 
-        # self.vars # TODO!!!! implement variable tracking, this is causing a problem
+        self.vars:list[list[tuple[VarName,Type]]] = [[]] # TODO!!!! finish implementation
+        # TODO we need to trace scope creation/deletion
 
     def __del__(self) -> None:
         self.file_out.close()
@@ -80,6 +81,8 @@ class Src:
         print(f'ERROR: file `{self.file_in}`: line {self.line_number}: {err_msg}', file=sys.stderr)
         sys.exit(1)
     
+    # register: functions
+
     def register_function_declaration(self, fn:FnSignature) -> None:
         found, sig = self.declared_functions.get_signature(fn.name)
         if found:
@@ -108,6 +111,19 @@ class Src:
     
     def function_name_in_register(self, fn:FnName) -> tuple[bool, FnSignature]:
         return self.declared_functions.get_signature(fn)
+    
+    # register: variables
+
+    def register_variable(self, name:VarName, typ:Type) -> None:
+        all_vars:list[tuple[VarName,Type]] = []
+        for v in self.vars:
+            all_vars.extend(v)
+        
+        for n, _t in all_vars:
+            if n.matches(name):
+                self.err(f'variable `{name.to_str()}` alredy exists')
+
+        self.vars[-1].append((name, typ))
 
     # pop: whitespace
 
@@ -411,10 +427,7 @@ class Src:
 
             if statement_begin.matches_str(ST_BEG_VAL) or statement_begin.matches_str(ST_BEG_VAR):
                 var_name, var_type = self.pop_var_name_and_type()
-
-                c_var_name = var_name.to_ccode()
-
-                c_var_type = var_type.to_ccode()
+                self.register_variable(var_name, var_type)
 
                 c_var_value = self.pop_value().to_ccode()
 
@@ -422,9 +435,9 @@ class Src:
 
                 ret = CCode('')
                 ret += const_prefix
-                ret += c_var_type
+                ret += var_type.to_ccode()
                 ret += CC_SPACE
-                ret += c_var_name
+                ret += var_name.to_ccode()
                 ret += CC_ASSIGN
                 ret += c_var_value
                 ret += CC_SEMICOLON_NEWLINE
