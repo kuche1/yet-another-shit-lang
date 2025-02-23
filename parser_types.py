@@ -232,7 +232,7 @@ class FnDeclArgs(BaseParserThingClass):
 class Var(BaseParserThingClass):
 
     def __init__(self, name_or_value:str, typ:Type):
-        self.name_or_value = name_or_value # TODO!!!! `name_or_value` is stupid and makes everything more complex, it only exists because string can be their own thing and are not put into variables
+        self.name_or_value = name_or_value # TODO!!! `name_or_value` is stupid and makes everything more complex, it only exists because string can be their own thing and are not put into variables
         self.typ = typ
 
     def to_str(self) -> str:
@@ -253,7 +253,7 @@ class Var(BaseParserThingClass):
 
 class FnCall(BaseParserThingClass):
 
-    # TODO!!!! actually, it wouldn't be a bad idea if we actually passed the signature here so that the check can happen inside instead of having it in 200 different places (that would also mean clearing that other place where they are checked manually (see pop_code_block_element))
+    # TODO!!! actually, it wouldn't be a bad idea if we actually passed the signature here so that the check can happen inside instead of having it in 200 different places (that would also mean clearing that other place where they are checked manually (see pop_code_block_element))
     def __init__(self, name:FnName, args:'ValueTuple', ret_type:Type):
         self.name = name
         self.args = args

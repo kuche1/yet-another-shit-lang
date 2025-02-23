@@ -57,8 +57,6 @@ class Src:
         self.defined_functions:FnSignatures = FnSignatures()
 
         self.vars:list[list[tuple[VarName,Type]]] = [[]] # adding the initial "global scope" just in case
-        # TODO!!!! finish implementation
-        # TODO we need to trace scope creation/deletion
 
     def __del__(self) -> None:
         self.file_out.close()
@@ -333,7 +331,7 @@ class Src:
 
         assert not in_string # should be unreachable
 
-        # TODO!!!! when the dependent code is ready, just create a new variable char* that point to this string and return the variable
+        # TODO!!! when the dependent code is ready, just create a new variable char* that point to this string and return the variable
         # if is_str(value):
         #     ...
 
