@@ -31,6 +31,9 @@ class CCode:
     def to_str(self) -> str:
         return f'{self.val}'
 
+    def to_TypeTuple(self) -> 'TypeTuple':
+        return TypeTuple(any=True)
+
     def empty(self) -> bool:
         return len(self.val) == 0
 
@@ -140,6 +143,34 @@ TYPE_STR = Type('str')
 TYPE_ANY = Type('any') # special placeholder type that needs to go later
 
 ######
+###### type tuple
+######
+
+class TypeTuple(BaseParserThingClass):
+
+    def __init__(self, any:bool=False) -> None:
+        self.any = any
+        self.vals:list[Type] = []
+
+    def to_str(self) -> str:
+        ret = ''
+        for typ in self.vals:
+            ret += f', {typ.to_str()}'
+        if ret.startswith(', '):
+            ret = ret[2:]
+        return ret
+
+    def matches(self, other:Self) -> bool:
+        if self.any or other.any:
+            return True
+
+        return self.vals == other.vals
+    
+    def add_another(self, val:Type) -> None:
+        assert not self.any
+        self.vals.append(val)
+
+######
 ###### fn decl args
 ######
 
@@ -176,6 +207,12 @@ class FnDeclArgs(BaseParserThingClass):
 
         ret += CCode(')')
         return ret
+    
+    def to_TypeTuple(self) -> 'TypeTuple':
+        ret = TypeTuple()
+        for name, typ in self.args:
+            ret.add_another(typ)
+        return ret
 
     # 1st ret is err, 2nd ret is reason
     def add_another(self, arg:tuple[VarName,Type]) -> tuple[bool, str]:
@@ -206,6 +243,9 @@ class Var(BaseParserThingClass):
             return CCode('"' + self.name_or_value[1:-1] + '"')
         else:
             return VarName(self.name_or_value).to_ccode() # needed so that we can have shit like `(` in the variable name
+    
+    def get_type(self) -> Type:
+        return self.typ
 
 ######
 ###### fn call
@@ -213,9 +253,11 @@ class Var(BaseParserThingClass):
 
 class FnCall(BaseParserThingClass):
 
-    def __init__(self, name:FnName, args:'ValueTuple'):
+    # TODO!!!! actually, it wouldn't be a bad idea if we actually passed the signature here so that the check can happen inside instead of having it in 200 different places (that would also mean clearing that other place where they are checked manually (see pop_code_block_element))
+    def __init__(self, name:FnName, args:'ValueTuple', ret_type:Type):
         self.name = name
         self.args = args
+        self.ret_type = ret_type
 
     def to_str(self) -> str:
         return f'{self.name.to_str()}{self.args.to_str()}'
@@ -224,6 +266,9 @@ class FnCall(BaseParserThingClass):
         ret = self.name.to_ccode()
         ret += self.args.to_ccode()
         return ret
+    
+    def get_ret_type(self) -> Type:
+        return self.ret_type
 
 ######
 ###### value
@@ -239,6 +284,14 @@ class Value(BaseParserThingClass):
     
     def to_ccode(self) -> CCode:
         return self.value.to_ccode()
+    
+    def to_Type(self) -> Type:
+        if isinstance(self.value, FnCall):
+            return self.value.get_ret_type()
+        elif isinstance(self.value, Var):
+            return self.value.get_type()
+        else:
+            assert False
 
 ######
 ###### value tuple
@@ -275,6 +328,12 @@ class ValueTuple(BaseParserThingClass):
 
         ret += CC_CB
 
+        return ret
+    
+    def to_TypeTuple(self) -> TypeTuple:
+        ret = TypeTuple()
+        for val in self.value:
+            ret.add_another(val.to_Type())
         return ret
 
     def add_another(self, item:Value) -> None:

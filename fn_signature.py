@@ -36,6 +36,15 @@ class FnSignature:
                 return False, f'arguments: {self.args} != {other.args}' # TODO!!! make this pretty and make a fnc for turning args like that into str
         
         return True, ''
+    
+    def get_can_ret_err(self) -> bool:
+        return self.can_ret_err
+    
+    def get_arg_types(self) -> TypeTuple:
+        return self.args.to_TypeTuple()
+    
+    def get_ret_type(self) -> Type:
+        return self.return_type
 
 DUMMY_FN_SIGNATURE = FnSignature(FnName('dummy'), False, Type('int'), CCode('(void)'))
 
