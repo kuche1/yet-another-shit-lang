@@ -345,9 +345,9 @@ class Src:
         assert not in_string # should be unreachable
 
         if is_str(value):
-            return self.wrap_rawvalue(value, TYPE_RAWSTR)
+            return self.wrap_rawvalue(value, TYPE_COMPTIME_STR)
 
-        # TODO if is_num(value): ...
+        # TODO!!!! if is_num(value): ...
 
         # `value` could be a value in itself or a function call
 
@@ -689,7 +689,7 @@ class Src:
 
     def get_var_type(self, var:str) -> Type:
         if is_str(var):
-            return TYPE_RAWSTR
+            return TYPE_COMPTIME_STR
         
         return self.get_registered_var_type(VarName(var))
 
@@ -710,9 +710,9 @@ class Src:
     def wrap_rawvalue(self, rawvalue:str, typ:Type) -> Value:
         name = VarName(f'$autogen{self.autogen_var_idx}$')
 
-        if typ.matches(TYPE_RAWSTR):
+        if typ.matches(TYPE_COMPTIME_STR):
             value = Value(Var(name.to_str(), TYPE_CSTR))
-            self.vars_for_auto_creation.append((name, typ, Value(Var(rawvalue, TYPE_RAWSTR))))
+            self.vars_for_auto_creation.append((name, typ, Value(Var(rawvalue, TYPE_COMPTIME_STR))))
         else:
             assert False
 

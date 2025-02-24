@@ -134,7 +134,7 @@ class Type(BaseParserThingClass):
         return f'{self.typ}'
 
     def to_ccode(self) -> CCode:
-        if self.matches(TYPE_RAWSTR):
+        if self.matches(TYPE_COMPTIME_STR):
             return CCode('char*')
         return VarName(self.typ).to_ccode()
 
@@ -144,7 +144,7 @@ class Type(BaseParserThingClass):
 
         return self.typ == other.typ
 
-TYPE_RAWSTR = Type('rawstr')
+TYPE_COMPTIME_STR = Type('comptime_str')
 TYPE_CSTR = Type('char*')
 TYPE_ANY = Type('any') # special placeholder type that needs to go later
 # TYPE_CSTR = Type('char*') # TODO better idea to use this I think
@@ -258,7 +258,7 @@ class Var(BaseParserThingClass):
         return f'{self.name_or_value}{VAR_TYPE_SEP}{self.typ.to_str()}'
 
     def to_ccode(self) -> CCode:
-        if self.typ.to_str() == TYPE_RAWSTR.to_str(): # kinda hacky but we can't use `matches`
+        if self.typ.to_str() == TYPE_COMPTIME_STR.to_str(): # kinda hacky but we can't use `matches`
             return CCode('"' + self.name_or_value[1:-1] + '"')
         else:
             return VarName(self.name_or_value).to_ccode() # needed so that we can have shit like `(` in the variable name
