@@ -134,6 +134,8 @@ class Type(BaseParserThingClass):
         return f'{self.typ}'
 
     def to_ccode(self) -> CCode:
+        if self.matches(TYPE_RAWSTR):
+            return CCode('char*')
         return VarName(self.typ).to_ccode()
 
     def matches(self, other:Self) -> bool:
@@ -142,8 +144,10 @@ class Type(BaseParserThingClass):
 
         return self.typ == other.typ
 
-TYPE_STR = Type('str')
+TYPE_RAWSTR = Type('rawstr')
+TYPE_CSTR = Type('char*')
 TYPE_ANY = Type('any') # special placeholder type that needs to go later
+# TYPE_CSTR = Type('char*') # TODO better idea to use this I think
 
 ######
 ###### type tuple
@@ -245,6 +249,7 @@ class FnDeclArgs(BaseParserThingClass):
 
 class Var(BaseParserThingClass):
 
+    # TODO!!!! actually, i think its about time that we got rid of `name_or_value`
     def __init__(self, name_or_value:str, typ:Type):
         self.name_or_value = name_or_value # TODO!!! `name_or_value` is stupid and makes everything more complex, it only exists because string can be their own thing and are not put into variables
         self.typ = typ
@@ -253,7 +258,7 @@ class Var(BaseParserThingClass):
         return f'{self.name_or_value}{VAR_TYPE_SEP}{self.typ.to_str()}'
 
     def to_ccode(self) -> CCode:
-        if self.typ.to_str() == TYPE_STR.to_str(): # kinda hacky but we can't use `matches`
+        if self.typ.to_str() == TYPE_RAWSTR.to_str(): # kinda hacky but we can't use `matches`
             return CCode('"' + self.name_or_value[1:-1] + '"')
         else:
             return VarName(self.name_or_value).to_ccode() # needed so that we can have shit like `(` in the variable name

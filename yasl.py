@@ -57,6 +57,11 @@ class Src:
 
         self.vars:list[list[tuple[VarName,Type]]] = [[]] # adding the initial "global scope" just in case
 
+        self.autogen_var_idx = 0
+        self.vars_for_auto_creation:list[tuple[VarName,Type,Value]] = []
+
+        self.scope_depth = 0
+
     def __del__(self) -> None:
         self.file_out.close()
 
@@ -111,12 +116,6 @@ class Src:
         return self.declared_functions.get_signature(fn)
     
     # register: variables
-
-    def scope_enter(self) -> None:
-        self.vars.append([])
-
-    def scope_leave(self) -> None:
-        del self.vars[-1]
 
     def register_variable(self, name:VarName, typ:Type) -> None:
         all_vars:list[tuple[VarName,Type]] = []
@@ -345,9 +344,10 @@ class Src:
 
         assert not in_string # should be unreachable
 
-        # TODO!! when the dependent code is ready, just create a new variable char* that point to this string and return the variable
-        # if is_str(value):
-        #     ...
+        if is_str(value):
+            return self.wrap_rawvalue(value, TYPE_RAWSTR)
+
+        # TODO if is_num(value): ...
 
         # `value` could be a value in itself or a function call
 
@@ -426,14 +426,14 @@ class Src:
 
         return True, fn_body_begin.to_str()
 
-    def pop_code_block_element(self) -> None|CCode:
+    # made private since I don't want to deal with having to memorize to call `scope_leave` every time I call this
+    def _pop_code_block_element(self) -> None|CCode:
         while True:
             statement_begin = self.pop_statement_beginning(orr=CODE_BLOCK_END)
 
             # fn body end
 
             if statement_begin is True:
-                self.scope_leave()
                 return None
             
             # ret
@@ -450,19 +450,9 @@ class Src:
                 var_name, var_type = self.pop_var_name_and_type()
                 self.register_variable(var_name, var_type)
 
-                c_var_value = self.pop_value().to_ccode()
-
-                const_prefix = CCode('const ') if statement_begin.matches_str(ST_BEG_VAL) else CCode('') # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
-
-                ret = CCode('')
-                ret += const_prefix
-                ret += var_type.to_ccode()
-                ret += CC_SPACE
-                ret += var_name.to_ccode()
-                ret += CC_ASSIGN
-                ret += c_var_value
-                ret += CC_SEMICOLON_NL
-                return ret
+                var_value = self.pop_value()
+            
+                return self.gen_ccode_var(var_name, var_type, var_value, const=statement_begin.matches_str(ST_BEG_VAL))
 
             # variable increase/decrease
 
@@ -562,11 +552,25 @@ class Src:
         data = CCode('')
 
         while True:
-            body_element:None|CCode = self.pop_code_block_element()
+            body_element:None|CCode = self._pop_code_block_element()
             if body_element is None:
                 break
 
             data += body_element
+
+        # this whole thing is kinda hacky, I know
+        if self.is_the_next_scope_leave_going_to_exit_the_function_body():
+            # TODO ideally we would do this on every scope leave but it too late and I really need to go to sleep
+
+            vars_code = CCode('')
+            for name, typ, value in self.unwrap_queue():
+                var = self.gen_ccode_var(name, typ, value) # var and not val since in the future we might actually want to edit that (pass it's address)
+                vars_code += var
+
+            vars_code += data # TODO just implement __add__ instead of using this stupid shit
+            data = vars_code
+
+        self.scope_leave()
 
         return data
 
@@ -685,9 +689,54 @@ class Src:
 
     def get_var_type(self, var:str) -> Type:
         if is_str(var):
-            return TYPE_STR
+            return TYPE_RAWSTR
         
         return self.get_registered_var_type(VarName(var))
+
+    def scope_enter(self) -> None:
+        self.vars.append([])
+        self.scope_depth += 1
+
+    def scope_leave(self) -> None:
+        del self.vars[-1]
+        self.scope_depth -= 1
+        assert self.scope_depth >= 0
+
+    def is_the_next_scope_leave_going_to_exit_the_function_body(self) -> int:
+        return self.scope_depth == 2 # 2 because we also create another scope for the function arguments
+
+    # creates a new "temporary" variable to put the given value in
+    # then return that variable name
+    def wrap_rawvalue(self, rawvalue:str, typ:Type) -> Value:
+        name = VarName(f'$autogen{self.autogen_var_idx}$')
+
+        if typ.matches(TYPE_RAWSTR):
+            value = Value(Var(name.to_str(), TYPE_CSTR))
+            self.vars_for_auto_creation.append((name, typ, Value(Var(rawvalue, TYPE_RAWSTR))))
+        else:
+            assert False
+
+        self.autogen_var_idx += 1
+
+        return value
+    
+    def unwrap_queue(self) -> tuple[tuple[VarName,Type,Value], ...]:
+        ret = tuple(self.vars_for_auto_creation)
+        self.vars_for_auto_creation = []
+        return ret
+    
+    def gen_ccode_var(self, name:VarName, typ:Type, value:Value, const:bool=False) -> CCode:
+        const_prefix = CCode('const ') if const else CCode('') # TODO you can't make gcc raise a warning if a variable was declared without const but was not modified, so we need to do something about this in the future
+
+        ret = CCode('')
+        ret += const_prefix
+        ret += typ.to_ccode()
+        ret += CC_SPACE
+        ret += name.to_ccode()
+        ret += CC_ASSIGN
+        ret += value.to_ccode()
+        ret += CC_SEMICOLON_NL
+        return ret
 
 ###
 ### main
