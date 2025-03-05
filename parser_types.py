@@ -34,7 +34,7 @@ class CCode:
         return f'{self.val}'
 
     def to_TypeTuple(self) -> 'TypeTuple':
-        return TypeTuple(any=True)
+        return TypeTuple(any_=True)
 
     def empty(self) -> bool:
         return len(self.val) == 0
@@ -155,8 +155,8 @@ TYPE_ANY = Type('any') # special placeholder type that needs to go later
 
 class TypeTuple(BaseParserThingClass):
 
-    def __init__(self, any:bool=False) -> None:
-        self.any = any
+    def __init__(self, any_:bool=False) -> None:
+        self.any = any_
         self.vals:list[Type] = []
 
     def to_str(self) -> str:
@@ -224,19 +224,21 @@ class FnDeclArgs(BaseParserThingClass):
     
     def to_TypeTuple(self) -> 'TypeTuple':
         ret = TypeTuple()
-        for name, typ in self.args:
+        for _name, typ in self.args:
             ret.add_another(typ)
         return ret
     
     def generator(self) -> Generator[tuple[VarName,Type]]:
-        for arg in self.args:
-            yield arg
+        # for arg in self.args:
+        #   yield arg
+        # pylint is telling me to use this instead
+        yield from self.args
 
     # 1st ret is err, 2nd ret is reason
     def add_another(self, arg:tuple[VarName,Type]) -> tuple[bool, str]:
-        arg_name, arg_type = arg
+        arg_name, _arg_type = arg
 
-        for name, typ in self.args:
+        for name, _typ in self.args:
             if name.matches(arg_name):
                 return True, f'argument {arg_name.to_str()} already specified'
 
@@ -260,8 +262,7 @@ class Var(BaseParserThingClass):
     def to_ccode(self) -> CCode:
         if self.typ.to_str() == TYPE_COMPTIME_STR.to_str(): # kinda hacky but we can't use `matches`
             return CCode('"' + self.name_or_value[1:-1] + '"')
-        else:
-            return VarName(self.name_or_value).to_ccode() # needed so that we can have shit like `(` in the variable name
+        return VarName(self.name_or_value).to_ccode() # needed so that we can have shit like `(` in the variable name
     
     def get_type(self) -> Type:
         return self.typ
@@ -319,10 +320,9 @@ class Value(BaseParserThingClass):
     def to_Type(self) -> Type:
         if isinstance(self.value, FnCall):
             return self.value.get_ret_type()
-        elif isinstance(self.value, Var):
+        if isinstance(self.value, Var):
             return self.value.get_type()
-        else:
-            assert False
+        assert False
 
 ######
 ###### value tuple
@@ -387,7 +387,7 @@ class FnSignature:
         return f'`fn {self.name.to_str()}{err_type}{self.return_type.to_str()} {self.args.to_str()}`'
 
     def __eq__(self, other:object) -> NoReturn:
-        assert False, f'trying to call __eq__ on FnSignature'
+        assert False, 'trying to call __eq__ on FnSignature'
     def matches(self, other:Self) -> tuple[bool, str]:
         if not self.name.matches(other.name):
             return False, f'name missmatch `{self.name.to_str()}` and `{other.name.to_str()}`'
@@ -447,8 +447,8 @@ def is_str(obj:str) -> bool:
             assert obj[1:-1].count('"') == 0
             return True
         return False
-    else:
-        assert False
+    
+    assert False
 
 def is_num(obj:str|VarName) -> bool:
     if isinstance(obj, str):
